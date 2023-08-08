@@ -35,3 +35,11 @@
 *.ilk
 *.pdb
 *.exp
+*.sln
+.idea
+.vs
+.vsconfig
+Intermediate
+DerivedDataCache
+Saved
+Binaries
