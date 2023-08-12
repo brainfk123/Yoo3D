@@ -18,7 +18,10 @@ public class Yoo : ModuleRules
 				"EnhancedInput", 
 				"AnimGraphRuntime",
 				"LiveLinkInterface",
-				"LiveLinkAnimationCore"
+				"LiveLinkAnimationCore",
+				"SlateCore",
+				"UMG",
+				"Slate"
 			});
 		bUseUnity = false;
 	}
