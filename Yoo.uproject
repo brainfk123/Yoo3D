@@ -1,6 +1,6 @@
 {
 	"FileVersion": 3,
-	"EngineAssociation": "{29293006-4379-9AC8-EF0E-09875F7BDB11}",
+	"EngineAssociation": "5.2",
 	"Category": "",
 	"Description": "",
 	"Modules": [
@@ -8,6 +8,11 @@
 			"Name": "Yoo",
 			"Type": "Runtime",
 			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "YooGraphNode",
+			"Type": "UncookedOnly",
+			"LoadingPhase": "PreDefault"
 		}
 	],
 	"Plugins": [
