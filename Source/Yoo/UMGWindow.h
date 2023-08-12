@@ -19,6 +19,9 @@ public:
 	void OpenAsWindow(UUserWidget* Widget, FString WindowTitle, FVector2D WindowPosition, FVector2D WindowSize,  bool bUseOsBorder, bool bHasTitleBar, bool bDragEverywhere);
  
 	UFUNCTION(BlueprintCallable)
+	void CloseWindow();
+	
+	UFUNCTION(BlueprintCallable)
 	void SetManualDpiScaling(bool bEnableManualScaling);
 	
 	UFUNCTION(BlueprintCallable)
@@ -29,6 +32,9 @@ public:
 
 	UPROPERTY(EditAnywhere)
 	bool bShowOnStartup;
+
+	UPROPERTY(EditAnywhere)
+	FString TitleName;
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;

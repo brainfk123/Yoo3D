@@ -75,6 +75,11 @@ void AUMGWindow::OpenAsWindow(UUserWidget* Widget, FString WindowTitle, FVector2
 	Window->SetContent(SlateWidget);
 }
 
+void AUMGWindow::CloseWindow()
+{
+	Window->RequestDestroyWindow();
+}
+
 void AUMGWindow::SetManualDpiScaling(bool bEnableManualScaling)
 {
 	bUseManualDPIScaling = bEnableManualScaling;
@@ -108,7 +113,7 @@ void AUMGWindow::BeginPlay()
 	Super::BeginPlay();
 	if (bShowOnStartup && IsValid(UmgWidget))
 	{
-		OpenAsWindow(UmgWidget, TEXT("Control Panel"), FVector2d::ZeroVector, {720, 1280}, false, true, true);
+		OpenAsWindow(UmgWidget, TitleName, FVector2d::ZeroVector, {720, 1280}, false, true, true);
 	}
 }
 
