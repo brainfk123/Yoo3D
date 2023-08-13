@@ -7,7 +7,7 @@
 #include "UMGWindow.generated.h"
 
 UCLASS(Blueprintable)
-class YOO_API AUMGWindow : public AActor
+class AUMGWindow : public AActor
 {
 	GENERATED_BODY()
 

@@ -21,7 +21,8 @@ public class Yoo : ModuleRules
 				"LiveLinkAnimationCore",
 				"SlateCore",
 				"UMG",
-				"Slate"
+				"Slate",
+				"AppFramework"
 			});
 		bUseUnity = false;
 	}
