@@ -50,8 +50,11 @@ void AUMGWindow::OpenAsWindow(UUserWidget* Widget, FString WindowTitle, FVector2
 		.MaxHeight(9999)
 		.MaxWidth(9999)
 		.SupportsTransparency(EWindowTransparency::None)
-		.LayoutBorder(FMargin {2, 2})
+		.LayoutBorder(FMargin {6, 6})
+		.UserResizeBorder(FMargin {4, 4})
 		.AdjustInitialSizeAndPositionForDPIScale(false)
+		.MinHeight(640)
+		.MinWidth(360)
 	;
  
 	// Add our new window to the Slate subsystem (which essentially opens it)
