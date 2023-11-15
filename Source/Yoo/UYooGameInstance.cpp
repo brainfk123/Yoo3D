@@ -1,32 +1,41 @@
 // Fill out your copyright notice in the Description page of Project Settings.
-
-
-#include "UMGWindow.h"
-#include "GenericPlatform/GenericWindowDefinition.h"
+#include "UYooGameInstance.h"
 #include "Blueprint/UserWidget.h"
 #include "Engine/UserInterfaceSettings.h"
 #include "Kismet/GameplayStatics.h"
 
-
-// Sets default values
-AUMGWindow::AUMGWindow()
+void UYooGameInstance::OnStart()
 {
-	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = true;
-	Window = nullptr;
-	bUseManualDPIScaling = false;
+	Super::OnStart();
+	
+	PrimaryTick.Target = this;
+	PrimaryTick.bCanEverTick = true;
+	
+	if (WidgetClass)
+	{
+		UMGWidget = NewObject<UUserWidget>(this, WidgetClass);
+		OpenAsWindow(TitleName, FVector2d::ZeroVector, {720, 1280}, false, true, true);
+	}
 }
 
-void AUMGWindow::OpenAsWindow(UUserWidget* Widget, FString WindowTitle, FVector2D WindowPosition, FVector2D WindowSize,
-	bool bUseOsBorder, bool bHasTitleBar, bool bDragEverywhere)
+void UYooGameInstance::OnWorldChanged(UWorld* OldWorld, UWorld* NewWorld)
 {
-	// Remember the reference to the UMG user widget, for later use
-	UmgWidget = Widget;
- 
+	Super::OnWorldChanged(OldWorld, NewWorld);
+
+	PrimaryTick.UnRegisterTickFunction();
+	if (NewWorld)
+	{
+		PrimaryTick.RegisterTickFunction(NewWorld->PersistentLevel);
+	}
+	PrimaryTick.SetTickFunctionEnable(true);
+}
+
+void UYooGameInstance::OpenAsWindow(FString WindowTitle, FVector2D WindowPosition, FVector2D WindowSize,
+                                    bool bUseOsBorder, bool bHasTitleBar, bool bDragEverywhere)
+{
 	// Remember original window size for the manual DPI scaling
 	WindowOriginalSize = WindowSize;
- 
- 
+	
 	/*
 	 * SET UP THE NEW WINDOW
 	 */
@@ -64,7 +73,7 @@ void AUMGWindow::OpenAsWindow(UUserWidget* Widget, FString WindowTitle, FVector2
 	Window.Get()->BringToFront(true);
  
 	// Bind a method to the OnClosed event, to clean up should the user, well, close the window
-	WindowClosedDelegate.BindUObject(this, &AUMGWindow::OnWindowClose);
+	WindowClosedDelegate.BindUObject(this, &UYooGameInstance::OnWindowClose);
 	Window->SetOnWindowClosed(WindowClosedDelegate);
  
 	/*
@@ -72,32 +81,32 @@ void AUMGWindow::OpenAsWindow(UUserWidget* Widget, FString WindowTitle, FVector2
 	 */
  
 	// Finally fetch the Slate widget from the UMG one....
-	TSharedRef<SWidget> SlateWidget = Widget->TakeWidget();
+	TSharedRef<SWidget> SlateWidget = UMGWidget->TakeWidget();
  
 	// ....and set it as content for our newly created/opened window
 	Window->SetContent(SlateWidget);
 }
 
-void AUMGWindow::CloseWindow()
+void UYooGameInstance::CloseWindow()
 {
 	Window->RequestDestroyWindow();
 }
 
-void AUMGWindow::SetManualDpiScaling(bool bEnableManualScaling)
+void UYooGameInstance::SetManualDpiScaling(bool bEnableManualScaling)
 {
 	bUseManualDPIScaling = bEnableManualScaling;
 }
 
-void AUMGWindow::OverrideManualDpiScalingWindowSize(FVector2D OverrideWindowSize)
+void UYooGameInstance::OverrideManualDpiScalingWindowSize(FVector2D OverrideWindowSize)
 {
 	WindowOriginalSize = OverrideWindowSize;
 }
 
-void AUMGWindow::OnWindowClose(const TSharedRef<SWindow>& InWindow)
+void UYooGameInstance::OnWindowClose(const TSharedRef<SWindow>& InWindow)
 {
 	// Clean up the UMG widget, i.e. remove it from the window and invalidate our reference
-	UmgWidget->RemoveFromParent();
-	UmgWidget = nullptr;
+	UMGWidget->RemoveFromParent();
+	UMGWidget = nullptr;
  
 	// Also clean up the window reference
 	Window.Reset();
@@ -110,21 +119,9 @@ void AUMGWindow::OnWindowClose(const TSharedRef<SWindow>& InWindow)
 	}
 }
 
-// Called when the game starts or when spawned
-void AUMGWindow::BeginPlay()
-{
-	Super::BeginPlay();
-	if (bShowOnStartup && IsValid(UmgWidget))
-	{
-		OpenAsWindow(UmgWidget, TitleName, FVector2d::ZeroVector, {720, 1280}, false, true, true);
-	}
-}
-
 // Called every frame
-void AUMGWindow::Tick(float DeltaTime)
+void UYooGameInstance::Tick(float DeltaTime)
 {
-	Super::Tick(DeltaTime);
-
 	FGeometry WindowGeometry;
 	FVector2D Scale;
 	float DPIFactor;
@@ -159,3 +156,33 @@ void AUMGWindow::Tick(float DeltaTime)
 	}
 }
 
+void FYooTickFunction::ExecuteTick(float DeltaTime, enum ELevelTick TickType, ENamedThreads::Type CurrentThread, const FGraphEventRef& MyCompletionGraphEvent)
+{
+	if (Target && IsValidChecked(Target) && !Target->IsUnreachable())
+	{
+		if (TickType != LEVELTICK_ViewportsOnly)
+		{
+			FScopeCycleCounterUObject ActorScope(Target);
+			Target->Tick(DeltaTime);
+		}
+	}
+}
+
+FString FYooTickFunction::DiagnosticMessage()
+{
+	return Target->GetFullName() + TEXT("[Tick]");
+}
+
+FName FYooTickFunction::DiagnosticContext(bool bDetailed)
+{
+	if (bDetailed)
+	{
+		// Format is "ActorNativeClass/ActorClass"
+		FString ContextString = FString::Printf(TEXT("%s/%s"), *GetParentNativeClass(Target->GetClass())->GetName(), *Target->GetClass()->GetName());
+		return FName(*ContextString);
+	}
+	else
+	{
+		return GetParentNativeClass(Target->GetClass())->GetFName();
+	}
+}
