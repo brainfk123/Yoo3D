@@ -51,6 +51,9 @@ class YOO_API UYooGameInstance : public UGameInstance
  
 	UFUNCTION(BlueprintCallable)
 	void CloseWindow();
+
+	UFUNCTION(BlueprintCallable)
+	UUserWidget* GetControlWidget();
 	
 	UFUNCTION(BlueprintCallable)
 	void SetManualDpiScaling(bool bEnableManualScaling);

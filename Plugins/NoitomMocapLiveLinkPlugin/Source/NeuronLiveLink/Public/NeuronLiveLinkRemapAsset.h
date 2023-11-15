@@ -52,6 +52,12 @@ class NEURONLIVELINK_API UNeuronLiveLinkRemapAsset : public ULiveLinkRetargetAss
 	UFUNCTION( BlueprintCallable, BlueprintNativeEvent, Category = "AxisNeuron Live Link Retarget" )
 		void GetSkeletonForwardVector( TEnumAsByte<EAxisOption::Type>& Axis )const;
 
+	UFUNCTION( BlueprintCallable, BlueprintNativeEvent, Category = "AxisNeuron Live Link Retarget" )
+		FTransform GetSkeletonRootTransform()const;
+
+	UFUNCTION( BlueprintCallable, Category = "AxisNeuron Live Link Retarget" )
+		UGameInstance* GetInstance()const;
+
     UPROPERTY(EditAnywhere, meta = (InlineEditConditionToggle), Category = "AxisNeuron Bone Mapping")
         bool bEnableBoneNamePrefix = false;
 

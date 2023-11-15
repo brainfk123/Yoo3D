@@ -34,6 +34,12 @@ void UNeuronLiveLinkRemapAsset::BeginDestroy ()
 	Super::BeginDestroy ();
 }
 
+UGameInstance* UNeuronLiveLinkRemapAsset::GetInstance() const
+{
+	UWorld* World = GEngine->GetWorldFromContextObject(this, EGetWorldErrorMode::LogAndReturnNull);
+	return World ? World->GetGameInstance() : nullptr;
+}
+
 void UNeuronLiveLinkRemapAsset::OnBlueprintClassCompiled (UBlueprint* TargetBlueprint)
 {
 	BoneNameMap.Reset ();
@@ -254,8 +260,8 @@ void UNeuronLiveLinkRemapAsset::BuildPoseFromAnimationData( float DeltaTime, con
 
 					if (BoneName == HipsNameInTargetSkeleton)
 					{
-						FTransform HipsTransform_InCS( RotationInCS, Input_Position );
-						OutPose[CPBoneIndex] = HipsTransform_InCS * HipsParentsTransform.Inverse( );
+						FTransform HipsTransform_InCS( RotationInCS, GetSkeletonRootTransform().TransformVector(Input_Position) );
+						OutPose[CPBoneIndex] = HipsTransform_InCS * HipsParentsTransform.Inverse( ) * GetSkeletonRootTransform();
 						continue;
 					}
 
@@ -329,7 +335,7 @@ void UNeuronLiveLinkRemapAsset::BuildPoseFromAnimationData( float DeltaTime, con
 
 					if (BoneName == HipsNameInTargetSkeleton)
 					{
-						FVector Dest_HipsPosition_InCS = BoneTransform.GetLocation( );
+						FVector Dest_HipsPosition_InCS = GetSkeletonRootTransform().TransformVector(BoneTransform.GetLocation());
 						FTransform Dest_HipsTransform_InCS( RotationInCS, Dest_HipsPosition_InCS );
 						OutPose[CPBoneIndex] = Dest_HipsTransform_InCS * HipsParentsTransform.Inverse( );
 						continue;
@@ -404,6 +410,11 @@ void UNeuronLiveLinkRemapAsset::BuildPoseAndCurveFromBaseData( float DeltaTime, 
 
 		BuildCurveData( BPCurveValues, OutPose, OutCurve );
 	}
+}
+
+FTransform UNeuronLiveLinkRemapAsset::GetSkeletonRootTransform_Implementation() const
+{
+	return FTransform::Identity;
 }
 
 void UNeuronLiveLinkRemapAsset::GetSkeletonForwardVector_Implementation( TEnumAsByte<EAxisOption::Type>& Axis )const

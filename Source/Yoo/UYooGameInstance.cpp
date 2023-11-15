@@ -92,6 +92,11 @@ void UYooGameInstance::CloseWindow()
 	Window->RequestDestroyWindow();
 }
 
+UUserWidget* UYooGameInstance::GetControlWidget()
+{
+	return UMGWidget;
+}
+
 void UYooGameInstance::SetManualDpiScaling(bool bEnableManualScaling)
 {
 	bUseManualDPIScaling = bEnableManualScaling;
