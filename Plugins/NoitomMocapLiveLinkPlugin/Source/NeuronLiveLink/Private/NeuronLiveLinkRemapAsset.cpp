@@ -260,8 +260,8 @@ void UNeuronLiveLinkRemapAsset::BuildPoseFromAnimationData( float DeltaTime, con
 
 					if (BoneName == HipsNameInTargetSkeleton)
 					{
-						FTransform HipsTransform_InCS( RotationInCS, GetSkeletonRootTransform().TransformVector(Input_Position) );
-						OutPose[CPBoneIndex] = HipsTransform_InCS * HipsParentsTransform.Inverse( ) * GetSkeletonRootTransform();
+						FTransform HipsTransform_InCS( RotationInCS, GetSkeletonRootTransform().TransformPosition(Input_Position) );
+						OutPose[CPBoneIndex] = HipsTransform_InCS * HipsParentsTransform.Inverse( );
 						continue;
 					}
 
@@ -335,7 +335,7 @@ void UNeuronLiveLinkRemapAsset::BuildPoseFromAnimationData( float DeltaTime, con
 
 					if (BoneName == HipsNameInTargetSkeleton)
 					{
-						FVector Dest_HipsPosition_InCS = GetSkeletonRootTransform().TransformVector(BoneTransform.GetLocation());
+						FVector Dest_HipsPosition_InCS = GetSkeletonRootTransform().TransformPosition(BoneTransform.GetLocation());
 						FTransform Dest_HipsTransform_InCS( RotationInCS, Dest_HipsPosition_InCS );
 						OutPose[CPBoneIndex] = Dest_HipsTransform_InCS * HipsParentsTransform.Inverse( );
 						continue;
