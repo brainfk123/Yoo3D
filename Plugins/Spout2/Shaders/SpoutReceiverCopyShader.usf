@@ -1,0 +1,14 @@
+#include "/Engine/Public/Platform.ush"
+
+Texture2D<float4> SrcTexture;
+
+void MainPixelShader(
+	float4 InPosition : SV_POSITION,
+	float2 InUV : TEXCOORD0,
+	out float4 OutColor : SV_Target0
+	)
+{
+	float SizeX, SizeY;
+	SrcTexture.GetDimensions(SizeX, SizeY);
+	OutColor = SrcTexture.Load(int3(SizeX * InUV.x, SizeY * InUV.y, 0)).rgba;
+}
