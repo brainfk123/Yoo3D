@@ -1,4 +1,4 @@
-// VRM4U Copyright (c) 2021-2022 Haruyoshi Yamamoto. This software is released under the MIT License.
+// VRM4U Copyright (c) 2021-2024 Haruyoshi Yamamoto. This software is released under the MIT License.
 
 #pragma once
 
@@ -30,4 +30,5 @@ class UVRM4UImporterFactory : public UFactory, public FReimportHandler
 protected:
 
 	FString fullFileName;
+	class UVrmAssetListObject* ReimportBase = nullptr;
 };

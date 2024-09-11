@@ -1,14 +1,16 @@
-﻿// VRM4U Copyright (c) 2021-2022 Haruyoshi Yamamoto. This software is released under the MIT License.
+﻿// VRM4U Copyright (c) 2021-2024 Haruyoshi Yamamoto. This software is released under the MIT License.
 
-#include "VrmUtil.h"
+#include "VrmConvert.h"
+#include "VRM4ULoaderLog.h"
 
-#include "VRM4U.h"
 #include "CoreMinimal.h"
 #include "UObject/ObjectMacros.h"
 #include "UObject/UObjectHash.h"
 #include "UObject/UObjectIterator.h"
+#include "UObject/Package.h"
 
 #include "Engine/Texture2D.h"
+#include "TextureResource.h"
 #include "Modules/ModuleManager.h"
 #include "IImageWrapper.h"
 #include "IImageWrapperModule.h"
@@ -19,6 +21,23 @@
 /////
 
 //test
+
+#if	UE_VERSION_OLDER_THAN(5,0,0)
+
+#if WITH_EDITOR==0
+#define VRM4U_UseLocalTGAHeader 1
+#endif
+
+#else
+#define VRM4U_UseLocalTGAHeader 1
+#endif
+
+
+#ifndef  VRM4U_UseLocalTGAHeader
+#define VRM4U_UseLocalTGAHeader 0
+#endif
+
+#if	VRM4U_UseLocalTGAHeader
 
 #pragma pack(push,1)
 
@@ -46,7 +65,7 @@ struct FTGAFileHeader
 	}
 };
 #pragma pack(pop)
-
+#endif
 
 void DecompressTGA_RLE_32bpp(const FTGAFileHeader* TGA, uint32* TextureData)
 {
@@ -254,6 +273,7 @@ void DecompressTGA_8bpp(const FTGAFileHeader* TGA, uint8* TextureData)
 
 
 bool DecompressTGA_helper(
+	const int dummy,
 	const FTGAFileHeader* TGA,
 	uint32*& TextureData,
 	const int32 TextureDataSize,
@@ -399,35 +419,15 @@ bool DecompressTGA(
 	int32 TextureDataSize = OutImage.RawData.Num();
 	uint32* TextureData = (uint32*)OutImage.RawData.GetData();
 
-	return DecompressTGA_helper(TGA, TextureData, TextureDataSize, Warn);
+	return DecompressTGA_helper(0, TGA, TextureData, TextureDataSize, Warn);
 }
 
-#if	UE_VERSION_OLDER_THAN(5,0,0)
-template<typename T>
-FTexturePlatformData* GetPlatformData(T *t) {
-	return t->PlatformData;
-}
-template<typename T, typename U>
-void SetPlatformData(T *t, U *u) {
-	t->PlatformData = u;
-}
-#else
-template<typename T>
-TFieldPtrAccessor<FTexturePlatformData> GetPlatformData(T *t) {
-	return t->GetPlatformData();
-}
-template<typename T, typename U>
-void SetPlatformData(T* t, U *u) {
-	t->SetPlatformData(u);
-}
-#endif
 
-
-UTexture2D* VRMUtil::CreateTextureFromImage(FString name, UPackage* package, const void* vBuffer, const size_t Length, bool bGenerateMips, bool bRuntimeMode) {
+UTexture2D* VRMLoaderUtil::CreateTextureFromImage(FString name, UPackage* package, const void* vBuffer, const size_t Length, bool bGenerateMips, bool bRuntimeMode) {
 
 	const char* Buffer = (const char*)vBuffer;
-	FImportImage img;
-	if (LoadImageFromMemory(Buffer, Length, img) == false) {
+	VRMUtil::FImportImage img;
+	if (VRMLoaderUtil::LoadImageFromMemory(Buffer, Length, img) == false) {
 		return nullptr;
 	}
 	UTexture2D *tex = CreateTexture(img.SizeX, img.SizeY, name, package);
@@ -513,7 +513,7 @@ UTexture2D* VRMUtil::CreateTextureFromImage(FString name, UPackage* package, con
 }
 
 
-UTexture2D* VRMUtil::CreateTexture(int32 InSizeX, int32 InSizeY, FString name, UPackage* package) {
+UTexture2D* VRMLoaderUtil::CreateTexture(int32 InSizeX, int32 InSizeY, FString name, UPackage* package) {
 	auto format = PF_B8G8R8A8;
 	UTexture2D* NewTexture = NULL;
 	if (InSizeX > 0 && InSizeY > 0 &&
@@ -544,7 +544,7 @@ UTexture2D* VRMUtil::CreateTexture(int32 InSizeX, int32 InSizeY, FString name, U
 				}
 			}
 
-			NewTexture = NewObject<UTexture2D>(
+			NewTexture = VRM4U_NewObject<UTexture2D>(
 				// GetTransientPackage(),
 				package,
 				*name,
@@ -577,14 +577,14 @@ UTexture2D* VRMUtil::CreateTexture(int32 InSizeX, int32 InSizeY, FString name, U
 		Mip->BulkData.Unlock();
 	} else
 	{
-		UE_LOG(LogVRM4U, Warning, TEXT("Invalid parameters specified for UTexture2D::Create()"));
+		UE_LOG(LogVRM4ULoader, Warning, TEXT("Invalid parameters specified for UTexture2D::Create()"));
 	}
 	return NewTexture;
 }
 
 
 
-bool VRMUtil::LoadImageFromMemory(const void* vBuffer, const size_t Length, VRMUtil::FImportImage& OutImage) {
+bool VRMLoaderUtil::LoadImageFromMemory(const void* vBuffer, const size_t Length, VRMUtil::FImportImage& OutImage) {
 	const char* Buffer = (const char*)vBuffer;
 
 	IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>(FName("ImageWrapper"));

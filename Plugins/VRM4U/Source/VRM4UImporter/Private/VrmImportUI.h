@@ -1,4 +1,4 @@
-// VRM4U Copyright (c) 2021-2022 Haruyoshi Yamamoto. This software is released under the MIT License.
+// VRM4U Copyright (c) 2021-2024 Haruyoshi Yamamoto. This software is released under the MIT License.
 
 #pragma once
 
@@ -7,6 +7,7 @@
 #include "UObject/Object.h"
 #include "Factories/ImportSettings.h"
 #include "VrmConvert.h"
+#include "Vrm1LicenseObject.h"
 
 #include "VrmImportUI.generated.h"
 
@@ -39,6 +40,15 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Mesh)
 	EVRMImportMaterialType MaterialType;
 
+#if UE_VERSION_OLDER_THAN(5,2,0)
+	static const bool VRM4U_UseUE5Mat = false;
+#else
+	static const bool VRM4U_UseUE5Mat = true;
+#endif
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = Mesh, meta = (ImportType = "StaticMesh|SkeletalMesh", DisplayName = "Use UE5 Material"))
+	bool bUseUE5Material = VRM4U_UseUE5Mat;
+
 	/** Outline Material*/
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = Mesh, meta = (ImportType = "StaticMesh|SkeletalMesh", DisplayName = "GenerateOutlineMaterial"))
 	bool bGenerateOutlineMaterial = true;
@@ -50,11 +60,11 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = Mesh, meta = (ImportType = "StaticMesh|SkeletalMesh", DisplayName = "Model scale"))
 	float ModelScale = 1.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = Mesh, meta = (ImportType = "StaticMesh|SkeletalMesh", DisplayName = "Model scale"))
-	float AnimationTranslateScale = 100.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = Mesh, meta = (ImportType = "StaticMesh|SkeletalMesh", DisplayName = "Animation Translate scale"))
+	float AnimationTranslateScale = 1.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = Mesh, meta = (ImportType = "StaticMesh|SkeletalMesh", DisplayName = "Animation Frame Rate"))
-	float FrameRate = 60.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = Mesh, meta = (ImportType = "StaticMesh|SkeletalMesh", DisplayName = "Animation Play Rate Scale"))
+	float PlayRateScale = 1.0f;
 
 	/** Remove Local Rotation for VRM10 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = Mesh, meta = (ImportType = "StaticMesh|SkeletalMesh", DisplayName = "VRM10 Remove Local Rotation"))
@@ -64,7 +74,11 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = Mesh, meta = (ImportType = "StaticMesh|SkeletalMesh", DisplayName = "VRM10 Bindpose"))
 	bool bVrm10Bindpose = false;
 
-	/** Duplicate mesh and renamed humanoid bone */
+	/** Force Original Bone Name */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = Mesh, meta = (ImportType = "StaticMesh|SkeletalMesh", DisplayName = "Force original bone name"))
+	bool bForceOriginalBoneName = false;
+
+		/** Duplicate mesh and renamed humanoid bone */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = Mesh, meta = (ImportType = "StaticMesh|SkeletalMesh", DisplayName="Generate renamed humanoid mesh"))
 	bool bGenerateHumanoidRenamedMesh = false;
 
@@ -88,8 +102,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = Mesh, meta = (ImportType = "StaticMesh|SkeletalMesh", DisplayName = "Eable MorphTarget Normal(TangentZDelta)"))
 	bool bEnableMorphTargetNormal = false;
 
-#define VRM4U_MorphStrictMode false
-
 #if UE_VERSION_OLDER_THAN(4,26,0)
 	static const bool VRM4U_UseBC7 = false;
 #else
@@ -97,9 +109,9 @@ public:
 #endif
 
 
-	/** Use Strict MorphTarget Name Mode */
-	//UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = Mesh, meta = (ImportType = "StaticMesh|SkeletalMesh", DisplayName = "**UE5EA** controlrig work around: Eable MorphTarget Name Check"))
-	bool bStrictMorphTargetNameMode = VRM4U_MorphStrictMode;
+	/** Force Original MorphTarget Name Mode */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = Mesh, meta = (ImportType = "StaticMesh|SkeletalMesh", DisplayName = "Force original morphtarget name"))
+	bool bForceOriginalMorphTargetName = false;
 
 	/** Use Strict MorphTarget Name Mode */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = Mesh, meta = (ImportType = "StaticMesh|SkeletalMesh", DisplayName = "Remove BlendShapeGroup prefix for old VRM file"))
@@ -115,7 +127,7 @@ public:
 
 	/** Save as single uasset file */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = Mesh, meta = (ImportType = "StaticMesh|SkeletalMesh", DisplayName = "Single uasset file"))
-	bool bSingleUAssetFile = true;
+	bool bSingleUAssetFile = false;
 
 	/** Use GridTexture by Default */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = Mesh, meta = (ImportType = "StaticMesh|SkeletalMesh", DisplayName = "[Texture] Use DummyGrid by DefaultBaseTexture"))
@@ -135,7 +147,7 @@ public:
 
 	/** Merge primitives using same material */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = Mesh, meta = (ImportType = "StaticMesh|SkeletalMesh", DisplayName = "[Optimize] Merge primitive"))
-	bool bMergePrimitive = true;
+	bool bMergePrimitive = false;
 
 	/** Use optimized MaterialInstance */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = Mesh, meta = (ImportType = "StaticMesh|SkeletalMesh", DisplayName="[Optimize] use opt material"))
@@ -168,9 +180,27 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = Mesh, meta = (ImportType = "StaticMesh|SkeletalMesh", DisplayName="[Debug] One bone only"))
 	bool bDebugOneBone = false;
 
+	/** for DEBUG. No mesh. Bone only */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = Mesh, meta = (ImportType = "StaticMesh|SkeletalMesh", DisplayName = "[Debug] No Mesh"))
+	bool bDebugNoMesh = false;
+
+	/** for DEBUG. No mesh. Bone only */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = Mesh, meta = (ImportType = "StaticMesh|SkeletalMesh", DisplayName = "[Debug] No Material"))
+	bool bDebugNoMaterial = false;
+
 	/** Skeleton to use for imported asset. When importing a mesh, leaving this as "None" will create a new skeleton. When importing an animation this MUST be specified to import the asset. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category=Mesh, meta=(ImportType="SkeletalMesh"))
 	class USkeleton* Skeleton;
+
+	//
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "VRM1_License")
+	TArray<FLicenseBoolDataPair> LicenseBool;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "VRM1_License")
+	TArray<FLicenseStringDataPair> LicenseString;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "VRM1_License")
+	TArray<FLicenseStringDataArray> LicenseStringArray;
 
 	//
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "License_Personation/CharacterizationPermission")

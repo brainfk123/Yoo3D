@@ -1,4 +1,4 @@
-// VRM4U Copyright (c) 2021-2022 Haruyoshi Yamamoto. This software is released under the MIT License.
+// VRM4U Copyright (c) 2021-2024 Haruyoshi Yamamoto. This software is released under the MIT License.
 
 #include "VRM4UImporterFactory.h"
 #include "VRM4UImporterLog.h"
@@ -36,6 +36,7 @@
 #include "VrmImportUI.h"
 #include "VrmConvert.h"
 #include "VrmLicenseObject.h"
+#include "Vrm1LicenseObject.h"
 
 #define LOCTEXT_NAMESPACE "VRMImporter"
 
@@ -192,8 +193,8 @@ UObject* UVRM4UImporterFactory::FactoryCreateBinary(UClass* InClass, UObject* In
 	if (fullFileName.IsEmpty()) {
 		return nullptr;
 	}
-	
-	static UVrmImportUI *ImportUI = nullptr;
+
+	static UVrmImportUI* ImportUI = nullptr;
 #if	UE_VERSION_OLDER_THAN(5,0,0)
 	TAssetPtr<UObject> refPointerToLic;
 #else
@@ -207,27 +208,61 @@ UObject* UVRM4UImporterFactory::FactoryCreateBinary(UClass* InClass, UObject* In
 
 		// to default
 		{
+			ImportUI->bVrm10RemoveLocalRotation = false;
+
 			ImportUI->ModelScale = 1.0f;
 			ImportUI->bMergeMaterial = true;
-			ImportUI->bMergePrimitive = true;
+			ImportUI->bMergePrimitive = false;
 			ImportUI->TitleAuthor.Empty();
 			ImportUI->Thumbnail = nullptr;
+
+			ImportUI->TitleAuthor.Empty();
+			ImportUI->Thumbnail = nullptr;
+			ImportUI->allowedUserName.Empty();
+			ImportUI->violentUsageName.Empty();
+			ImportUI->sexualUsageName.Empty();
+			ImportUI->commercialUsageName.Empty();
+			ImportUI->otherPermissionUrl.Empty();
+			ImportUI->licenseName.Empty();
+			ImportUI->otherLicenseUrl.Empty();
+
+			ImportUI->LicenseString.Empty();
+			ImportUI->LicenseBool.Empty();
+			ImportUI->LicenseStringArray.Empty();
 		}
 
 		if (1) {
-			auto *p = ULoaderBPFunctionLibrary::GetVRMMeta(fullFileName);
-			if (p) {
-				ImportUI->TitleAuthor = TEXT("\"") + p->title + TEXT("\"") + TEXT(" / ") + TEXT("\"") + p->author + TEXT("\"");
-				ImportUI->Thumbnail = p->thumbnail;
-				ImportUI->allowedUserName = p->allowedUserName;
-				ImportUI->violentUsageName = p->violentUsageName;
-				ImportUI->sexualUsageName = p->sexualUsageName;
-				ImportUI->commercialUsageName = p->commercialUsageName;
-				ImportUI->otherPermissionUrl = p->otherPermissionUrl;
-				ImportUI->licenseName = p->licenseName;
-				ImportUI->otherLicenseUrl = p->otherLicenseUrl;
+			UVrmLicenseObject* a = nullptr;
+			UVrm1LicenseObject* b = nullptr;
+			ULoaderBPFunctionLibrary::GetVRMMeta(fullFileName, a, b);
+			if (a) {
+				ImportUI->TitleAuthor = TEXT("\"") + a->title + TEXT("\"") + TEXT(" / ") + TEXT("\"") + a->author + TEXT("\"");
+				ImportUI->Thumbnail = a->thumbnail;
+				ImportUI->allowedUserName = a->allowedUserName;
+				ImportUI->violentUsageName = a->violentUsageName;
+				ImportUI->sexualUsageName = a->sexualUsageName;
+				ImportUI->commercialUsageName = a->commercialUsageName;
+				ImportUI->otherPermissionUrl = a->otherPermissionUrl;
+				ImportUI->licenseName = a->licenseName;
+				ImportUI->otherLicenseUrl = a->otherLicenseUrl;
 
-				refPointerToLic = p;
+				refPointerToLic = a;
+			}
+			if (b) {
+				{
+					auto *p = b->LicenseString.FindByPredicate([](const FLicenseStringDataPair &pair) {
+						if (pair.key == TEXT("name")) return true;
+						return false;
+						});
+					if (p) {
+						ImportUI->TitleAuthor = p->value;
+					}
+				}
+				ImportUI->Thumbnail = b->thumbnail;
+				ImportUI->LicenseString = b->LicenseString;
+				ImportUI->LicenseBool = b->LicenseBool;
+				ImportUI->LicenseStringArray = b->LicenseStringArray;
+				refPointerToLic = b;
 			}
 			{
 				const FString Extension = FPaths::GetExtension(fullFileName);
@@ -241,11 +276,12 @@ UObject* UVRM4UImporterFactory::FactoryCreateBinary(UClass* InClass, UObject* In
 					ImportUI->ModelScale = 0.01f;
 				}
 			}
-#if	UE_VERSION_OLDER_THAN(5,3,0)
-#else
+#if	UE_VERSION_OLDER_THAN(5,2,0)
 			{
-				ImportUI->bSingleUAssetFile = false;
+				ImportUI->bSingleUAssetFile = true;
 			}
+#else
+			// 5.2でも動くが、デフォルトをOFFにする
 #endif
 
 
@@ -272,7 +308,7 @@ UObject* UVRM4UImporterFactory::FactoryCreateBinary(UClass* InClass, UObject* In
 		}
 
 		// Compute centered window position based on max window size, which include when all categories are expanded
-		const float FbxImportWindowWidth = 410.0f*2.f;
+		const float FbxImportWindowWidth = 410.0f * 2.f;
 		const float FbxImportWindowHeight = 750.0f;
 		FVector2D FbxImportWindowSize = FVector2D(FbxImportWindowWidth, FbxImportWindowHeight); // Max window size it can get based on current slate
 
@@ -327,11 +363,15 @@ UObject* UVRM4UImporterFactory::FactoryCreateBinary(UClass* InClass, UObject* In
 	//UObject* objFinder = StaticLoadObject(UVrmAssetListObject::StaticClass(), nullptr, TEXT("/VRM4U/VrmObjectListBP.VrmObjectListBP_C"));
 	//UObject* objFinder = NewObject<UVrmAssetListObject>(InParent, NAME_None, RF_Transactional);
 
+	auto& importOption = VRMConverter::Options::Get();
+	importOption.SetVrmOption(ImportUI->GenerateOptionData());
+
+
 #if	UE_VERSION_OLDER_THAN(5,0,0)
-	TAssetPtr<UVrmAssetListObject> m;
+	TAssetPtr<UVrmAssetListObject> vrmAssetList;
 	TArray< TAssetPtr<UObject> > tt;
 #else
-	TSoftObjectPtr<UVrmAssetListObject> m;
+	TSoftObjectPtr<UVrmAssetListObject> vrmAssetList;
 	TArray< TSoftObjectPtr<UObject> > tt;
 #endif
 	tt.Add(InParent);
@@ -355,10 +395,16 @@ UObject* UVRM4UImporterFactory::FactoryCreateBinary(UClass* InClass, UObject* In
 				}
 			}
 		}
-
-		if (c == nullptr) {
-			FSoftObjectPath r(TEXT("/VRM4U/VrmAssetListObjectBP.VrmAssetListObjectBP"));
+		if (c == nullptr || VRMConverter::Options::Get().IsUE5Material()) {
+			FSoftObjectPath r(TEXT("/VRM4U/VrmAssetListObjectBPUE5.VrmAssetListObjectBPUE5"));
 			UObject *u = r.TryLoad();
+			if (u) {
+				c = (UClass*)(Cast<UBlueprint>(u)->GeneratedClass);
+			}
+		}
+		if (c == nullptr){
+			FSoftObjectPath r(TEXT("/VRM4U/VrmAssetListObjectBP.VrmAssetListObjectBP"));
+			UObject* u = r.TryLoad();
 			if (u) {
 				c = (UClass*)(Cast<UBlueprint>(u)->GeneratedClass);
 			}
@@ -368,7 +414,16 @@ UObject* UVRM4UImporterFactory::FactoryCreateBinary(UClass* InClass, UObject* In
 			c = UVrmAssetListObject::StaticClass();
 		}
 
-		m = NewObject<UVrmAssetListObject>((UObject*)GetTransientPackage(), c.Get());
+		{
+			if (ReimportBase) {
+				vrmAssetList = ReimportBase;
+			}
+			if (vrmAssetList) {
+				vrmAssetList->MarkPackageDirty();
+			}else{
+				vrmAssetList = NewObject<UVrmAssetListObject>((UObject*)GetTransientPackage(), c.Get());
+			}
+		}
 
 	}
 
@@ -378,7 +433,7 @@ UObject* UVRM4UImporterFactory::FactoryCreateBinary(UClass* InClass, UObject* In
 	//auto aaa = NewObject<UObject>(c);
 
 	UVrmAssetListObject* mret = nullptr;
-	if (m) {
+	if (vrmAssetList) {
 		//auto a = NewObject<UVrmAssetListObject>(MatClass.Object, NAME_None, RF_Transactional);
 		//MatClass.Object; 
 		//ULoaderBPFunctionLibrary::LoadVRMFile(nullptr, fullFileName);
@@ -386,12 +441,10 @@ UObject* UVRM4UImporterFactory::FactoryCreateBinary(UClass* InClass, UObject* In
 		GWarn->BeginSlowTask( NSLOCTEXT("UnrealEd", "ImportVRM", "Importing VRM"), true );
 
 		int ret = true;
-		auto &g = VRMConverter::Options::Get();
-		g.SetVrmOption(ImportUI->GenerateOptionData());
 
 		ULoaderBPFunctionLibrary::SetImportMode(true, Cast<UPackage>(InParent));
 		{
-			ret = ULoaderBPFunctionLibrary::LoadVRMFileLocal(m.Get(), mret, fullFileName);
+			ret = ULoaderBPFunctionLibrary::LoadVRMFileLocal(vrmAssetList.Get(), mret, fullFileName);
 		}
 
 		/*
@@ -425,7 +478,15 @@ UObject* UVRM4UImporterFactory::FactoryCreateBinary(UClass* InClass, UObject* In
 		*/
 
 		ULoaderBPFunctionLibrary::SetImportMode(false, nullptr);
-		g.SetVrmOption(nullptr);
+		importOption.SetVrmOption(nullptr);
+
+#if	UE_VERSION_OLDER_THAN(4,22,0)
+#else
+		if (GEditor) {
+			GEditor->GetEditorSubsystem<UImportSubsystem>()->BroadcastAssetPostImport(this, mret);
+		}
+#endif
+
 
 		GWarn->EndSlowTask();
 
@@ -436,9 +497,8 @@ UObject* UVRM4UImporterFactory::FactoryCreateBinary(UClass* InClass, UObject* In
 			return nullptr;
 		}
 	}
-
 	//return InParent;
-	return mret->GetOuter();
+	return mret;// ->GetOuter();
 }
 UObject* UVRM4UImporterFactory::FactoryCreateText(UClass* InClass, UObject* InParent, FName InName, EObjectFlags Flags, UObject* Context, const TCHAR* Type, const TCHAR*& Buffer, const TCHAR* BufferEnd, FFeedbackContext* Warn)
 {
@@ -489,6 +549,14 @@ EReimportResult::Type UVRM4UImporterFactory::Reimport(UObject* Obj) {
 		return EReimportResult::Failed;
 	}
 #endif
+
+#if	UE_VERSION_OLDER_THAN(4,26,0)
+#else
+	ReimportBase = asset;
+	asset->Package = asset->GetPackage();
+	asset->ReimportBase = asset;
+#endif
+
 	{
 		FString str = asset->AssetImportData->GetSourceData().SourceFiles[0].RelativeFilename;
 		fullFileName = UAssetImportData::ResolveImportFilename(str, asset->Package);
@@ -498,6 +566,9 @@ EReimportResult::Type UVRM4UImporterFactory::Reimport(UObject* Obj) {
 	bool b_dummy = false;
 
 	UObject* n = FactoryCreateBinary(nullptr, asset->Package, "name", (EObjectFlags)0, nullptr, nullptr, buf_dummy, buf_dummy, nullptr, b_dummy);
+
+	ReimportBase = nullptr;
+	fullFileName = "";
 
 	if (n == nullptr) {
 		return EReimportResult::Failed;

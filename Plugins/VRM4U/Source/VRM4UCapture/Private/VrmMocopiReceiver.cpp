@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// VRM4U Copyright (c) 2021-2024 Haruyoshi Yamamoto. This software is released under the MIT License.
 
 
 #include "VrmMocopiReceiver.h"

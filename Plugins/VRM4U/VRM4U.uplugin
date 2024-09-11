@@ -36,6 +36,16 @@
       "LoadingPhase": "Default"
     },
     {
+      "Name": "VRM4UCaptureEditor",
+      "Type": "UncookedOnly",
+      "LoadingPhase": "PreDefault"
+    },
+    {
+      "Name": "VRM4URender",
+      "Type": "Runtime",
+      "LoadingPhase": "PostConfigInit"
+    },
+    {
       "_comment_vrm4u_dummy": "Use Developer instead of UncookedOnly for UE4.23-",
       "Name": "VRM4UImporter",
       "Type": "UncookedOnly",
@@ -62,10 +72,15 @@
       "Enabled": true
     },
     {
+      "_comment_vrm4u_dummy": "IKRig Plugin for Use UE5.0+",
       "Name": "IKRig",
+      "Enabled": true
+    },
+    {
+      "_comment_vrm4u_dummy": "OSC Plugin for Use UE5.0+",
+      "Name": "OSC",
       "Enabled": true
     }
   ],
-  "_comment_vrm4u_dummy": "IKRig Plugin for Use UE5.0+"
-
+  "_comment_vrm4u_dummy": "comment"
 }

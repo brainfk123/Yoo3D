@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// VRM4U Copyright (c) 2021-2024 Haruyoshi Yamamoto. This software is released under the MIT License.
 
 #pragma once
 
@@ -11,6 +11,7 @@
 #include "Sockets.h"
 #include "Common/UdpSocketBuilder.h"
 #include "Misc/EngineVersionComparison.h"
+#include "Tickable.h"
 
 
 #if	UE_VERSION_OLDER_THAN(4,26,0)
@@ -34,10 +35,10 @@ struct FStructMocopiData{
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VRM4U")
-	int FrameNo;
+	int FrameNo = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VRM4U")
-	int Time;
+	int Time = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, EditFixedSize, Category = "VRM4U")
 	TArray<FTransform> MocopiTransformWorld;

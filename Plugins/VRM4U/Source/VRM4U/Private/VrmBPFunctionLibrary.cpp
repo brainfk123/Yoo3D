@@ -1,7 +1,8 @@
-// VRM4U Copyright (c) 2021-2022 Haruyoshi Yamamoto. This software is released under the MIT License.
+// VRM4U Copyright (c) 2021-2024 Haruyoshi Yamamoto. This software is released under the MIT License.
 
 #include "VrmBPFunctionLibrary.h"
 #include "Materials/MaterialInterface.h"
+#include "TextureResource.h"
 
 #include "Engine/Engine.h"
 #include "Engine/TextureRenderTarget2D.h"
@@ -18,6 +19,7 @@
 #else
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetRegistry/ARFilter.h"
+#include "AssetRegistry/AssetData.h"
 #endif
 
 #include "Components/SkeletalMeshComponent.h"
@@ -1037,6 +1039,43 @@ bool UVrmBPFunctionLibrary::VRMRenderingThreadEnable(bool bEnable) {
 	return true;
 }
 
+int UVrmBPFunctionLibrary::VRMGetMeshSectionNum(const USkeletalMesh* mesh) {
+	if (mesh == nullptr) return 0;
+	return mesh->GetResourceForRendering()->LODRenderData[0].RenderSections.Num();
+
+/*
+	FSkeletalMeshRenderData* SkelMeshRenderData = GetResourceForRendering();
+	for (int32 LODIndex = MinLODIndex; LODIndex < SkelMeshRenderData->LODRenderData.Num(); LODIndex++)
+	{
+		FSkeletalMeshLODRenderData& LODRenderData = SkelMeshRenderData->LODRenderData[LODIndex];
+		const FSkeletalMeshLODInfo& Info = *(GetLODInfo(LODIndex));
+
+		// Check all render sections for the used material indices
+		for (int32 SectionIndex = 0; SectionIndex < LODRenderData.RenderSections.Num(); SectionIndex++)
+		{
+			FSkelMeshRenderSection& RenderSection = LODRenderData.RenderSections[SectionIndex];
+
+			// By default use the material index of the render section
+
+
+*/
+}
+
+bool UVrmBPFunctionLibrary::VRMRemoveMeshSection(USkeletalMesh* mesh, int LODIndex, int SectionIndex) {
+#if WITH_EDITOR
+	if (mesh == nullptr) return false;
+
+	if (mesh->GetResourceForRendering()->LODRenderData.IsValidIndex(LODIndex)) {
+
+		mesh->RemoveMeshSection(LODIndex, SectionIndex);
+		mesh->MarkPackageDirty();
+		return true;
+	}
+#endif
+	return false;
+}
+
+
 bool UVrmBPFunctionLibrary::VRMGetShadowEnable(const USkeletalMesh *mesh, int MaterialIndex) {
 
 	if (mesh == nullptr) {
@@ -1670,8 +1709,11 @@ bool UVrmBPFunctionLibrary::VRMBakeAnim(const USkeletalMeshComponent* skc, const
 
 #if	UE_VERSION_OLDER_THAN(5,0,0)
 		ase->AddNewRawTrack(BoneName, &RawTrack);
-#else
+#elif UE_VERSION_OLDER_THAN(5,2,0)
 		ase->GetController().AddBoneTrack(BoneName);
+		ase->GetController().SetBoneTrackKeys(BoneName, RawTrack.PosKeys, RawTrack.RotKeys, RawTrack.ScaleKeys);
+#else
+		ase->GetController().AddBoneCurve(BoneName);
 		ase->GetController().SetBoneTrackKeys(BoneName, RawTrack.PosKeys, RawTrack.RotKeys, RawTrack.ScaleKeys);
 #endif
 
@@ -1689,8 +1731,14 @@ bool UVrmBPFunctionLibrary::VRMBakeAnim(const USkeletalMeshComponent* skc, const
 #if	UE_VERSION_OLDER_THAN(5,0,0)
 		ase->SequenceLength = totalTime;
 		ase->MarkRawDataAsModified();
-#else
+#elif UE_VERSION_OLDER_THAN(5,2,0)
 		ase->GetController().SetPlayLength(totalTime);
+		//ase->MarkRawDataAsModified();
+		ase->SetUseRawDataOnly(true);
+		ase->FlagDependentAnimationsAsRawDataOnly();
+		ase->UpdateDependentStreamingAnimations();
+#else
+		ase->GetController().SetNumberOfFrames(ase->GetController().ConvertSecondsToFrameNumber(totalTime));
 		//ase->MarkRawDataAsModified();
 		ase->SetUseRawDataOnly(true);
 		ase->FlagDependentAnimationsAsRawDataOnly();
@@ -1746,7 +1794,11 @@ void UVrmBPFunctionLibrary::VRMGetAllActorsHasSceneComponent(const UObject* Worl
 
 void UVrmBPFunctionLibrary::VRMGetRigNodeNameFromBoneName(const USkeleton* skeleton, const FName& boneName, FName& RigNodeName){
 #if WITH_EDITOR
+#if UE_VERSION_OLDER_THAN(5,4,0)
 	RigNodeName = skeleton->GetRigNodeNameFromBoneName(boneName);
+#else
+	RigNodeName = NAME_None;
+#endif
 #endif
 }
 
@@ -1760,11 +1812,17 @@ void UVrmBPFunctionLibrary::VRMSetPerBoneMotionBlur(USkinnedMeshComponent* Skinn
 //void UVrmBPFunctionLibrary::GetIKRigDefinition(UIKRetargeter, UIKRigDefinition*& src, UIKRigDefinition*& target) {
 void UVrmBPFunctionLibrary::VRMGetIKRigDefinition(UObject *retargeter, UObject * &src, UObject * &target) {
 #if	UE_VERSION_OLDER_THAN(5,0,0)
-#else
+#elif UE_VERSION_OLDER_THAN(5,4,0)
 	UIKRetargeter* r = Cast<UIKRetargeter>(retargeter);
 	if (r) {
 		src = Cast<UIKRigDefinition>(r->GetSourceIKRigWriteable());
 		target = Cast <UIKRigDefinition>(r->GetTargetIKRigWriteable());
+	}
+#else
+	UIKRetargeter* r = Cast<UIKRetargeter>(retargeter);
+	if (r) {
+		src = Cast<UIKRigDefinition>(r->GetIKRigWriteable(ERetargetSourceOrTarget::Source));
+		target = Cast <UIKRigDefinition>(r->GetIKRigWriteable(ERetargetSourceOrTarget::Target));
 	}
 #endif
 }
@@ -1801,3 +1859,9 @@ void UVrmBPFunctionLibrary::VRMGetTopLevelAssetName(const FAssetData& target, FN
 #endif
 
 }
+
+
+UVrmAssetListObject* UVrmBPFunctionLibrary::VRMGetVrmAssetListObjectFromAsset(const UObject* Asset) {
+	return VRMUtil::GetAssetListObject(Asset);
+}
+

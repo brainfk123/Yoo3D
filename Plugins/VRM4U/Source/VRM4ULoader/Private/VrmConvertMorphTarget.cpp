@@ -1,4 +1,4 @@
-// VRM4U Copyright (c) 2021-2022 Haruyoshi Yamamoto. This software is released under the MIT License.
+// VRM4U Copyright (c) 2021-2024 Haruyoshi Yamamoto. This software is released under the MIT License.
 
 #include "VrmConvertMorphTarget.h"
 #include "VrmConvert.h"
@@ -26,118 +26,6 @@
 #include <assimp/postprocess.h>
 #include <assimp/GltfMaterial.h>
 #include <assimp/vrm/vrmmeta.h>
-
-namespace {
-	void LocalSanitizeName(FString& InOutName)
-	{
-		// Sanitize the name
-		for (int32 i = 0; i < InOutName.Len(); ++i)
-		{
-			TCHAR& C = InOutName[i];
-
-			const bool bGoodChar =
-				((C >= 'A') && (C <= 'Z')) || ((C >= 'a') && (C <= 'z')) ||		// A-Z (upper and lowercase) anytime
-				(C == '_') ||													// _ anytime
-				((i > 0) && (C >= '0') && (C <= '9'));							// 0-9 after the first character
-
-			if (!bGoodChar)
-			{
-				C = '_';
-			}
-		}
-
-		//if (InOutName.Len() > GetMaxNameLength())
-		//{
-		//	InOutName.LeftChopInline(InOutName.Len() - GetMaxNameLength());
-		//}
-	}
-
-	FName LocalGetSanitizedName(const FString& InName)
-	{
-		FString Name = InName;
-		LocalSanitizeName(Name);
-
-		if (Name.IsEmpty())
-		{
-			return NAME_None;
-		}
-
-		return *Name;
-	}
-
-	FName LocalGetSafeNewName(const FString& InName, TFunction<bool(const FString&)> IsNameAvailableFunction)
-	{
-		check(IsNameAvailableFunction);
-
-		FString SanitizedName = InName;
-		LocalSanitizeName(SanitizedName);
-		FString Name = SanitizedName;
-
-		int32 Suffix = 1;
-		while (!IsNameAvailableFunction(Name))
-		{
-			FString BaseString = SanitizedName;
-			//if (BaseString.Len() > GetMaxNameLength() - 4)
-			//{
-			//	BaseString.LeftChopInline(BaseString.Len() - (GetMaxNameLength() - 4));
-			//}
-			Name = *FString::Printf(TEXT("%s_%d"), *BaseString, ++Suffix);
-		}
-		return *Name;
-	}
-
-	bool LocalIsNameAvailable(const FString& InName)// , ERigElementType InElementType, FString* OutErrorMessage)
-	{
-		FString UnsanitizedName = InName;
-		//if (UnsanitizedName.Len() > GetMaxNameLength())
-		//{
-		//	if (OutErrorMessage)
-		//	{
-		//		*OutErrorMessage = TEXT("Name too long.");
-		//	}
-		//	return false;
-		//}
-
-		FString SanitizedName = UnsanitizedName;
-		LocalSanitizeName(SanitizedName);
-
-		if (SanitizedName != UnsanitizedName)
-		{
-			//if (OutErrorMessage)
-			//{
-			//	*OutErrorMessage = TEXT("Name contains invalid characters.");
-			//}
-			return false;
-		}
-
-		//if (GetIndex(FRigElementKey(*InName, InElementType)) != INDEX_NONE)
-		//{
-		//	if (OutErrorMessage)
-		//	{
-		//		*OutErrorMessage = TEXT("Name already used.");
-		//	}
-		//	return false;
-		//}
-
-		return true;
-	}
-
-	FName LocalGetSafeNewName(const FString& InPotentialNewName)
-	{
-		return LocalGetSafeNewName(InPotentialNewName, [](const FString& InName) -> bool {
-			return LocalIsNameAvailable(InName);
-		});
-	}
-
-	bool LocalIsReplaceAll(const FString& str) {
-		for (int i = 0; i < str.Len(); ++i) {
-			if (str[i] != '_') {
-				return false;
-			}
-		}
-		return true;
-	}
-}
 
 namespace {
 #if WITH_EDITOR
@@ -294,29 +182,47 @@ static bool readMorph2(TArray<FMorphTargetDelta> &MorphDeltas, aiString targetNa
 				++VertexCount;
 
 				if (aiA.mVertices) {
+
+					auto aiV = aiA.mVertices[i] - aiM.mVertices[i];
+
 					v.PositionDelta.Set(
-						-aiA.mVertices[i][0] * 100.f,
-						aiA.mVertices[i][2] * 100.f,
-						aiA.mVertices[i][1] * 100.f
+						-aiV[0] * 100.f,
+						aiV[2] * 100.f,
+						aiV[1] * 100.f
 					);
+
+					if (VRMConverter::Options::Get().IsVRM10Model()) {
+						v.PositionDelta.Set(
+							aiV[0] * 100.f,
+							-aiV[2] * 100.f,
+							aiV[1] * 100.f
+						);
+					}
 				}
 
 				v.PositionDelta *= VRMConverter::Options::Get().GetModelScale();
 
-				if (VRMConverter::Options::Get().IsVRM10Model()) {
-					v.PositionDelta.X *= -1.f;
-					v.PositionDelta.Y *= -1.f;
-				}
 
 				if (bIncludeNormal) {
+
+					auto aiV = aiA.mNormals[i] - aiM.mNormals[i];
+
 #if	UE_VERSION_OLDER_THAN(5,0,0)
-					const FVector n(
+					FVector n(
 #else
-					const FVector3f n(
+					FVector3f n(
 #endif
-						-aiA.mNormals[i][0],
-						aiA.mNormals[i][2],
-						aiA.mNormals[i][1]);
+						-aiV[0],
+						aiV[2],
+						aiV[1]);
+
+					if (VRMConverter::Options::Get().IsVRM10Model()) {
+						n.Set(
+							aiV[0],
+							-aiV[2],
+							aiV[1]);
+					}
+
 					if (n.Size() > 1.f) {
 						v.TangentZDelta = n.GetUnsafeNormal();
 					}
@@ -377,8 +283,9 @@ bool VRMConverter::ConvertMorphTarget(UVrmAssetListObject *vrmAssetList) {
 
 			FString morphName = UTF8_TO_TCHAR(aiA.mName.C_Str());
 			FString morphNameOrg = morphName;
-			if (VRMConverter::Options::Get().IsStrictMorphTargetNameMode()) {
-				morphName = LocalGetSafeNewName(morphName).ToString();
+			if (VRMConverter::Options::Get().IsForceOriginalMorphTargetName()) {
+			}else{
+				morphName = VRMUtil::MakeName(morphName);
 				//morphName = VRMConverter::NormalizeFileName(morphName);
 
 				if (morphName != morphNameOrg) {
@@ -386,7 +293,7 @@ bool VRMConverter::ConvertMorphTarget(UVrmAssetListObject *vrmAssetList) {
 
 						auto tmp = morphName;
 						int i = 0;
-						if (LocalIsReplaceAll(morphName)) {
+						if (VRMUtil::IsNoSafeName(morphName)) {
 							tmp = TEXT("UE5EA_patch_") + morphName + TEXT("_") + FString::FromInt(i);
 						}
 						while (MorphNameList.Find(tmp) != INDEX_NONE) {
@@ -477,7 +384,27 @@ bool VRMConverter::ConvertMorphTarget(UVrmAssetListObject *vrmAssetList) {
 	}
 #endif
 
-	sk->UnregisterAllMorphTarget();
+	{
+		// remove all morph & morph curve
+		sk->UnregisterAllMorphTarget();
+
+#if WITH_EDITOR
+#if	UE_VERSION_OLDER_THAN(5,3,0)
+#else
+		{
+			TArray<FName> namelist;
+			VRMGetSkeleton(sk)->GetCurveMetaDataNames(namelist);
+			for (auto name : namelist) {
+				FCurveMetaData* m = VRMGetSkeleton(sk)->GetCurveMetaData(name);
+				if (m == nullptr) continue;
+				if (m->Type.bMorphtarget) {
+					VRMGetSkeleton(sk)->RemoveCurveMetaData(name);
+				}
+			}
+		}
+#endif
+#endif
+	}
 
 	for (int i=0; i<MorphTargetList.Num(); ++i){
 		auto *mt = MorphTargetList[i];
@@ -487,9 +414,13 @@ bool VRMConverter::ConvertMorphTarget(UVrmAssetListObject *vrmAssetList) {
 			VRMGetMorphTargets(sk).Add(mt);
 		}
 	}
+
 	for (auto name : MorphNameList) {
 		FCurveMetaData* FoundCurveMetaData = VRMGetSkeleton(sk)->GetCurveMetaData(*name);
-		if (FoundCurveMetaData == nullptr) continue;
+		if (FoundCurveMetaData) {
+			FoundCurveMetaData->Type.bMorphtarget = true;
+			continue;
+		}
 
 		VRMGetSkeleton(sk)->AccumulateCurveMetaData(*name, false, true);
 	}
@@ -511,7 +442,18 @@ bool VRMConverter::ConvertMorphTarget(UVrmAssetListObject *vrmAssetList) {
 				}
 			}
 #endif
+
+#if	UE_VERSION_OLDER_THAN(5,4,0)
 			sk->GetResourceForRendering()->LODRenderData[0].InitResources(false, 0, VRMGetMorphTargets(sk), sk);
+#else
+			{
+				TArray<UMorphTarget*> morphtargets;
+				for (auto morphtarget : VRMGetMorphTargets(sk)) {
+					morphtargets.Add(morphtarget);
+				}
+				sk->GetResourceForRendering()->LODRenderData[0].InitResources(false, 0, morphtargets, sk);
+			}
+#endif
 		}
 	}
 #endif

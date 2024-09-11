@@ -1,4 +1,4 @@
-// VRM4U Copyright (c) 2021-2022 Haruyoshi Yamamoto. This software is released under the MIT License.
+// VRM4U Copyright (c) 2021-2024 Haruyoshi Yamamoto. This software is released under the MIT License.
 
 #pragma once
 
@@ -30,6 +30,13 @@ public:
 	virtual bool IsImportedAsset() const override { return true; }
 };
 class FAssetTypeActions_VrmLicense : public FAssetTypeActions_VrmBase
+{
+public:
+	// IAssetTypeActions Implementation
+	virtual FText GetName() const override;
+	virtual UClass* GetSupportedClass() const override;
+};
+class FAssetTypeActions_Vrm1License : public FAssetTypeActions_VrmBase
 {
 public:
 	// IAssetTypeActions Implementation

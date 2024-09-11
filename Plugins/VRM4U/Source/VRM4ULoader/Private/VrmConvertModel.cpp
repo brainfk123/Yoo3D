@@ -1,5 +1,7 @@
-﻿// VRM4U Copyright (c) 2021-2022 Haruyoshi Yamamoto. This software is released under the MIT License.
-// Copyright 1998-2018 Epic Games, Inc. All Rights Reserved.
+﻿// Copyright 1998-2018 Epic Games, Inc. All Rights Reserved.
+// The code associated with the initialization of the mesh is based on the Engine source.
+// VRM4U Copyright (c) 2021-2024 Haruyoshi Yamamoto. This software is released under the MIT License.
+
 
 #include "VrmConvertModel.h"
 #include "VrmConvert.h"
@@ -22,11 +24,10 @@
 
 #include "PhysicsEngine/PhysicsAsset.h"
 #include "PhysicsEngine/PhysicsConstraintTemplate.h"
-
 #include "Internationalization/Internationalization.h"
 
 #include "Animation/AnimSequence.h"
-
+#include "Animation/AnimBlueprint.h"
 #include "Async/ParallelFor.h"
 
 #include <assimp/Importer.hpp>
@@ -35,6 +36,11 @@
 #include <assimp/postprocess.h>
 #include <assimp/GltfMaterial.h>
 #include <assimp/vrm/vrmmeta.h>
+
+#if WITH_EDITOR
+#include "Kismet2/KismetEditorUtilities.h"
+#endif
+
 
 #define LOCTEXT_NAMESPACE "VRM4U"
 
@@ -170,6 +176,10 @@ static int GetChildBoneLocal(const USkeleton *skeleton, const int32 ParentBoneIn
 
 static void FindMeshInfo(const aiScene* scene, aiNode* node, FReturnedData& result, UVrmAssetListObject *vrmAssetList)
 {
+	if (VRMConverter::Options::Get().IsDebugNoMesh()) {
+		return;
+	}
+
 	for (uint32 MeshNo = 0; MeshNo < node->mNumMeshes; MeshNo++)
 	{
 		FString Fs = UTF8_TO_TCHAR(node->mName.C_Str());
@@ -604,7 +614,7 @@ bool VRMConverter::ConvertModel(UVrmAssetListObject *vrmAssetList) {
 		UE_LOG(LogVRM4ULoader, Warning, TEXT("test null.\n"));
 	}
 
-	if (aiData->HasMeshes())
+	if (aiData->HasMeshes() && VRMConverter::Options::Get().IsDebugNoMesh() == false)
 	{
 
 		// !! before remove unused vertex !!
@@ -653,7 +663,6 @@ bool VRMConverter::ConvertModel(UVrmAssetListObject *vrmAssetList) {
 				}
 			}
 		}
-
 		result.meshInfo.SetNum(aiData->mNumMeshes, false);
 
 
@@ -680,7 +689,6 @@ bool VRMConverter::ConvertModel(UVrmAssetListObject *vrmAssetList) {
 							continue;
 						}
 					}
-
 
 					result.meshInfo[meshNo].Triangles.Push(aiData->mMeshes[meshNo]->mFaces[faceNo].mIndices[indexNo]);
 
@@ -976,7 +984,8 @@ bool VRMConverter::ConvertModel(UVrmAssetListObject *vrmAssetList) {
 		if (VRMConverter::Options::Get().IsVRM10Model() && VRMConverter::Options::Get().IsVRM10Bindpose() == false) {
 			if (vrmAssetList->Pose_bind.Num() == 0 || vrmAssetList->Pose_tpose.Num() == 0) {
 				UE_LOG(LogVRM4ULoader, Warning, TEXT("BindPose -> TPose :: no bindpose array!"));
-			}else{
+			}
+			else {
 				auto& info = vrmAssetList->MeshReturnedData->meshInfo;
 				struct WeightData {
 					FString boneName;
@@ -1019,11 +1028,15 @@ bool VRMConverter::ConvertModel(UVrmAssetListObject *vrmAssetList) {
 				{
 					int vertexOffset = 0;
 					for (uint32_t meshNo = 0; meshNo < scene->mNumMeshes; ++meshNo) {
+						if (info.IsValidIndex(meshNo) == false) {
+							break;
+						}
 						auto* mesh = scene->mMeshes[meshNo];
 
 						for (int vertexNo = 0; vertexNo < info[meshNo].Vertices.Num(); ++vertexNo) {
 							FVector v_orig = info[meshNo].Vertices[vertexNo];
-							v_orig.Set(mesh->mVertices[vertexNo].x, mesh->mVertices[vertexNo].y, mesh->mVertices[vertexNo].z);
+							//v_orig.Set(mesh->mVertices[vertexNo].x, mesh->mVertices[vertexNo].y, mesh->mVertices[vertexNo].z);
+							v_orig.Set(mesh->mVertices[vertexNo].x, -mesh->mVertices[vertexNo].z, mesh->mVertices[vertexNo].y);
 							FVector v(0, 0, 0);
 
 							if (weightTable.Find(vertexOffset + vertexNo) == nullptr) {
@@ -1050,6 +1063,7 @@ bool VRMConverter::ConvertModel(UVrmAssetListObject *vrmAssetList) {
 									UE_LOG(LogVRM4ULoader, Warning, TEXT("BindPose -> TPose :: no pose transform %p %p"), tpose, bpose);
 								}
 							}
+							v.Set(v.X, v.Z, -v.Y);
 							info[meshNo].Vertices[vertexNo] = v / 100.f;
 						}
 						vertexOffset += mesh->mNumVertices;
@@ -1073,7 +1087,7 @@ bool VRMConverter::ConvertModel(UVrmAssetListObject *vrmAssetList) {
 #if	UE_VERSION_OLDER_THAN(4,23,0)
 			new(p->LODRenderData) FSkeletalMeshLODRenderData();
 #else
-			auto *tmp = new FSkeletalMeshLODRenderData();
+			auto* tmp = new FSkeletalMeshLODRenderData();
 			p->LODRenderData.Add(tmp);
 #endif
 		}
@@ -1100,9 +1114,9 @@ bool VRMConverter::ConvertModel(UVrmAssetListObject *vrmAssetList) {
 #else
 				TArray<FSkinWeightInfo> InWeights;
 #endif
-				
+
 				InWeights.SetNum(allVertex);
-				for (auto &a : InWeights) {
+				for (auto& a : InWeights) {
 					memset(a.InfluenceBones, 0, sizeof(a.InfluenceBones));
 					memset(a.InfluenceWeights, 0, sizeof(a.InfluenceWeights));
 				}
@@ -1113,7 +1127,12 @@ bool VRMConverter::ConvertModel(UVrmAssetListObject *vrmAssetList) {
 
 		sk->InitResources();
 
-		VRMGetMaterials(sk).SetNum(vrmAssetList->Materials.Num());
+
+		if (VRMConverter::Options::Get().IsDebugNoMaterial()) {
+			//VRMGetMaterials(sk).SetNum(vrmAssetList->Materials.Num());
+		}else{
+			VRMGetMaterials(sk).SetNum(vrmAssetList->Materials.Num());
+		}
 		for (int i = 0; i < VRMGetMaterials(sk).Num(); ++i) {
 			VRMGetMaterials(sk)[i].MaterialInterface = vrmAssetList->Materials[i];
 			VRMGetMaterials(sk)[i].MaterialSlotName = UTF8_TO_TCHAR(aiData->mMaterials[i]->GetName().C_Str());
@@ -1204,7 +1223,7 @@ bool VRMConverter::ConvertModel(UVrmAssetListObject *vrmAssetList) {
 
 					v.PositionVertexBuffer.VertexPosition(currentVertex + i).Set(-a.X, a.Z, a.Y);
 					if (VRMConverter::Options::Get().IsVRM10Model()) {
-						v.PositionVertexBuffer.VertexPosition(currentVertex + i).Set(a.X, a.Y, a.Z);
+						v.PositionVertexBuffer.VertexPosition(currentVertex + i).Set(a.X, -a.Z, a.Y);
 					}else if (VRMConverter::Options::Get().IsPMXModel() || VRMConverter::Options::Get().IsBVHModel()) {
 						v.PositionVertexBuffer.VertexPosition(currentVertex + i).X *= -1.f;
 						v.PositionVertexBuffer.VertexPosition(currentVertex + i).Y *= -1.f;
@@ -1232,7 +1251,11 @@ bool VRMConverter::ConvertModel(UVrmAssetListObject *vrmAssetList) {
 						FVector n_tmp(-n.X, n.Z, n.Y);
 						FVector t_tmp(-mInfo.Tangents[i].X, mInfo.Tangents[i].Z, mInfo.Tangents[i].Y);
 
-						if (VRMConverter::Options::Get().IsVRM10Model() || VRMConverter::Options::Get().IsPMXModel() || VRMConverter::Options::Get().IsBVHModel()) {
+						if (VRMConverter::Options::Get().IsVRM10Model()) {
+							n_tmp.Set(n.X, -n.Z, n.Y);
+							t_tmp.Set(mInfo.Tangents[i].X, -mInfo.Tangents[i].Z, mInfo.Tangents[i].Y);
+						}
+						if (VRMConverter::Options::Get().IsPMXModel() || VRMConverter::Options::Get().IsBVHModel()) {
 							FVector tmpv(-1, -1, 1);
 							n_tmp *= tmpv;
 							t_tmp *= tmpv;
@@ -1294,6 +1317,9 @@ bool VRMConverter::ConvertModel(UVrmAssetListObject *vrmAssetList) {
 							continue;
 						}
 						for (int jj = 0; jj < MAX_TOTAL_INFLUENCES; ++jj) {
+							if (Weight.IsValidIndex(aiW.mVertexId + currentVertex) == false) {
+								continue;
+							}
 							auto& s = Weight[aiW.mVertexId + currentVertex];
 							if (s.InfluenceWeights[jj] > 0) {
 								continue;
@@ -1327,6 +1353,9 @@ bool VRMConverter::ConvertModel(UVrmAssetListObject *vrmAssetList) {
 							continue;
 						}
 						for (int jj = 0; jj < MAX_TOTAL_INFLUENCES; ++jj) {
+							if (Weight.IsValidIndex(aiW.mVertexId + currentVertex) == false) {
+								continue;
+							}
 							auto &s = Weight[aiW.mVertexId + currentVertex];
 							if (s.InfluenceWeights[jj] > 0) {
 								continue;
@@ -1458,6 +1487,17 @@ bool VRMConverter::ConvertModel(UVrmAssetListObject *vrmAssetList) {
 					if (&w == &meshWeight[0]) {
 						warnCount = 0;
 					}
+
+					// sort by Weight
+					for (int i = 0; i < MAX_TOTAL_INFLUENCES - 1; ++i) {
+						for (int j = i + 1; j < MAX_TOTAL_INFLUENCES; ++j) {
+							if (w.InfluenceWeights[i] < w.InfluenceWeights[j]) {
+								std::swap(w.InfluenceWeights[i], w.InfluenceWeights[j]);
+								std::swap(w.InfluenceBones[i], w.InfluenceBones[j]);
+							}
+						}
+					}
+
 					int f = 0;
 					int maxIndex = 0;
 					int maxWeight = 0;
@@ -1504,16 +1544,6 @@ bool VRMConverter::ConvertModel(UVrmAssetListObject *vrmAssetList) {
 							const int n = Options::Get().GetBoneWeightInfluenceNum();
 
 							{
-								// sort by Weight
-								for (int i = 0; i < MAX_TOTAL_INFLUENCES-1; ++i) {
-									for (int j = i + 1; j < MAX_TOTAL_INFLUENCES; ++j) {
-										if (w.InfluenceWeights[i] < w.InfluenceWeights[j]) {
-											std::swap(w.InfluenceWeights[i], w.InfluenceWeights[j]);
-											std::swap(w.InfluenceBones[i], w.InfluenceBones[j]);
-										}
-									}
-								}
-
 								// recalc weight
 								f = 0;
 								for (int i = 0; i < n; ++i) {
@@ -1526,13 +1556,18 @@ bool VRMConverter::ConvertModel(UVrmAssetListObject *vrmAssetList) {
 									w.InfluenceBones[i] = 0;
 									w.InfluenceWeights[i] = 0;
 								}
+
 								int total = 0;
 								for (int i = 0; i < MAX_TOTAL_INFLUENCES; ++i) {
 									int t = w.InfluenceWeights[i];
-									w.InfluenceWeights[i] = (VRM4U_BONE_INFLUENCE_TYPE)(VRM4U_MaxBoneWeightFloat * t / f);
+									w.InfluenceWeights[i] = (VRM4U_BONE_INFLUENCE_TYPE)FMath::TruncToInt(VRM4U_MaxBoneWeightFloat * t / f);
 									total += w.InfluenceWeights[i];
 								}
 								// adjust
+								if (total > VRM4U_MaxBoneWeight) {
+									UE_LOG(LogVRM4ULoader, Warning, TEXT("overr"));
+									w.InfluenceWeights[0] -= (VRM4U_BONE_INFLUENCE_TYPE)(total - VRM4U_MaxBoneWeight);
+								}
 								w.InfluenceWeights[0] += (VRM4U_BONE_INFLUENCE_TYPE)(VRM4U_MaxBoneWeight - total);
 							}
 						}
@@ -1723,6 +1758,17 @@ bool VRMConverter::ConvertModel(UVrmAssetListObject *vrmAssetList) {
 					int f = 0;
 					int maxIndex = 0;
 					int maxWeight = 0;
+
+#if	UE_VERSION_OLDER_THAN(5,2,0)
+#else
+#if WITH_EDITOR
+#else
+					for (int i = 0; i < Options::Get().GetBoneWeightInfluenceNum(); ++i) {
+						w.InfluenceWeights[i] = (VRM4U_BONE_INFLUENCE_TYPE)(((int)(w.InfluenceWeights[i] / 256)) * 256);
+					}
+#endif
+#endif
+
 					for (int i = 0; i < MAX_TOTAL_INFLUENCES; ++i) {
 						f += w.InfluenceWeights[i];
 
@@ -1756,7 +1802,7 @@ bool VRMConverter::ConvertModel(UVrmAssetListObject *vrmAssetList) {
 				p->ActiveBoneIndices = rd.ActiveBoneIndices;
 				p->RequiredBones = rd.RequiredBones;
 			}
-#else
+#else // game
 
 #if	UE_VERSION_OLDER_THAN(4,25,0)
 #else
@@ -1789,12 +1835,21 @@ bool VRMConverter::ConvertModel(UVrmAssetListObject *vrmAssetList) {
 
 				pRd->ReleaseResources();
 				pRd->SkinWeightVertexBuffer = InWeights;
-
+#if	UE_VERSION_OLDER_THAN(5,4,0)
 				pRd->InitResources(false, 0, VRMGetMorphTargets(sk), sk);
+#else
+				{
+					TArray<UMorphTarget*> dummy;
+					for (auto& a : VRMGetMorphTargets(sk)) {
+						dummy.Add(a);
+					}
+					pRd->InitResources(false, 0, dummy, sk);
+				}
+#endif // 5.4
 			}
-#endif
+#endif // 4.25
 
-#endif
+#endif // editor
 
 			//rd.StaticVertexBuffers.StaticMeshVertexBuffer.TexcoordDataPtr;
 
@@ -1802,13 +1857,20 @@ bool VRMConverter::ConvertModel(UVrmAssetListObject *vrmAssetList) {
 				ENQUEUE_RENDER_COMMAND(UpdateCommand)(
 					[sk, Triangles, Weight](FRHICommandListImmediate& RHICmdList)
 				{
+
+#if	UE_VERSION_OLDER_THAN(5,3,0)
+#define VRM4U_RHI_CMD_LIST
+#else
+#define VRM4U_RHI_CMD_LIST RHICmdList
+#endif
+
 					FSkeletalMeshLODRenderData &d = sk->GetResourceForRendering()->LODRenderData[0];
 
 					if (d.MultiSizeIndexContainer.IsIndexBufferValid()) {
 						d.MultiSizeIndexContainer.GetIndexBuffer()->ReleaseResource();
 					}
 					d.MultiSizeIndexContainer.RebuildIndexBuffer(sizeof(uint32), Triangles);
-					d.MultiSizeIndexContainer.GetIndexBuffer()->InitResource();
+					d.MultiSizeIndexContainer.GetIndexBuffer()->InitResource(VRM4U_RHI_CMD_LIST);
 
 					//d.AdjacencyMultiSizeIndexContainer.CopyIndexBuffer(Triangles);
 #if	UE_VERSION_OLDER_THAN(5,0,0)
@@ -1861,10 +1923,10 @@ bool VRMConverter::ConvertModel(UVrmAssetListObject *vrmAssetList) {
 #else
 #endif
 
-					d.StaticVertexBuffers.PositionVertexBuffer.UpdateRHI();
-					d.StaticVertexBuffers.StaticMeshVertexBuffer.UpdateRHI();
+					d.StaticVertexBuffers.PositionVertexBuffer.UpdateRHI(VRM4U_RHI_CMD_LIST);
+					d.StaticVertexBuffers.StaticMeshVertexBuffer.UpdateRHI(VRM4U_RHI_CMD_LIST);
 
-					d.MultiSizeIndexContainer.GetIndexBuffer()->UpdateRHI();
+					d.MultiSizeIndexContainer.GetIndexBuffer()->UpdateRHI(VRM4U_RHI_CMD_LIST);
 #if	UE_VERSION_OLDER_THAN(5,0,0)
 					d.AdjacencyMultiSizeIndexContainer.GetIndexBuffer()->UpdateRHI();
 #endif
@@ -2086,9 +2148,6 @@ bool VRMConverter::ConvertModel(UVrmAssetListObject *vrmAssetList) {
 															//sk->SkeletalBodySetups.Num();
 					bs->CreatePhysicsMeshes();
 
-#if WITH_EDITOR
-					//pa->InvalidateAllPhysicsMeshes();
-#endif
 				}// collision
 			}
 
@@ -2116,8 +2175,8 @@ bool VRMConverter::ConvertModel(UVrmAssetListObject *vrmAssetList) {
 
 #if WITH_EDITOR
 	// animation
-	if (aiData->mNumAnimations > 0){
-		UAnimSequence *ase;
+	if (aiData->mNumAnimations > 0) {
+		UAnimSequence* ase;
 		ase = VRM4U_NewObject<UAnimSequence>(vrmAssetList->Package, *(TEXT("A_") + vrmAssetList->BaseFileName), EObjectFlags::RF_Public | EObjectFlags::RF_Standalone);
 		ase->SetSkeleton(k);
 
@@ -2144,6 +2203,25 @@ bool VRMConverter::ConvertModel(UVrmAssetListObject *vrmAssetList) {
 #endif
 		Controller.ResetModel();
 
+		double AnimDeltaTime = 0.f;
+		{
+			for (uint32_t animNo = 0; animNo < aiData->mNumAnimations; animNo++) {
+				aiAnimation* aiA = aiData->mAnimations[animNo];
+
+				for (uint32_t chanNo = 0; chanNo < aiA->mNumChannels; chanNo++) {
+					aiNodeAnim* aiNA = aiA->mChannels[chanNo];
+
+					for (int i = 0; i < (int)(aiNA->mNumRotationKeys)-1; ++i) {
+						auto dif = (aiNA->mRotationKeys[i+1].mTime - aiNA->mRotationKeys[i].mTime) / aiA->mTicksPerSecond;
+						if (AnimDeltaTime == 0.f && dif != 0.f) {
+							AnimDeltaTime = dif;
+						}
+					}
+				}
+			}
+		}
+
+
 #if	UE_VERSION_OLDER_THAN(5,2,0)
 		Controller.SetPlayLength(FrameNum-1);
 		Controller.SetFrameRate(FFrameRate(1, 1));
@@ -2151,14 +2229,21 @@ bool VRMConverter::ConvertModel(UVrmAssetListObject *vrmAssetList) {
 		Controller.InitializeModel();
 		ase->ResetAnimation();
 		ase->SetPreviewMesh(sk);
+		if (AnimDeltaTime > 0.f) {
+			Controller.SetFrameRate(FFrameRate(1.f / AnimDeltaTime, 1));
+		} else {
+			Controller.SetFrameRate(FCommonFrameRates::FPS_30());
+		}
 		Controller.SetNumberOfFrames(FrameNum - 1);
-		Controller.SetFrameRate(FCommonFrameRates::FPS_30());
 #endif
+
+#if	UE_VERSION_OLDER_THAN(5,3,0)
 		Controller.UpdateCurveNamesFromSkeleton(k, ERawCurveTrackTypes::RCT_Float);
+#endif
 
 		//Controller.OpenBracket(LOCTEXT("VRM4U", "Importing BVH"), false);
 
-		ase->RateScale = VRMConverter::Options::Get().GetAnimationFrameRate();
+		ase->RateScale = VRMConverter::Options::Get().GetAnimationPlayRateScale();
 #endif
 
 
@@ -2171,22 +2256,64 @@ bool VRMConverter::ConvertModel(UVrmAssetListObject *vrmAssetList) {
 
 			for (uint32_t animNo = 0; animNo < aiData->mNumAnimations; animNo++) {
 				aiAnimation* aiA = aiData->mAnimations[animNo];
-				
+
 				for (uint32_t chanNo = 0; chanNo < aiA->mNumChannels; chanNo++) {
 					aiNodeAnim* aiNA = aiA->mChannels[chanNo];
 
 					FRawAnimSequenceTrack RawTrack;
 
+					bool isRootBone = false;
+					FName NodeName = UTF8_TO_TCHAR(aiNA->mNodeName.C_Str());
+					if (VRMConverter::Options::Get().IsVRMAModel()) {
+						if (vrmAssetList->VrmMetaObject) {
+							for (auto& t : vrmAssetList->VrmMetaObject->humanoidBoneTable) {
+
+								if (t.Value == NodeName.ToString()) {
+									NodeName = *t.Key;
+									break;
+								}
+							}
+						}
+					}
+					{
+						auto ind = k->GetReferenceSkeleton().FindBoneIndex(NodeName);
+						if (ind != INDEX_NONE) {
+							ind = k->GetReferenceSkeleton().GetParentIndex(ind);
+							if (ind == INDEX_NONE) {
+								// root bone. no parent.
+
+								isRootBone = true;
+							}
+						}
+					}
+
 					{
 						for (uint32_t i = 0; i < aiNA->mNumPositionKeys; ++i) {
 							const auto &v = aiNA->mPositionKeys[i].mValue;
 							//FVector pos(v.x, v.y, v.z);
+							float Scale = 1.f;
+							if (VRMConverter::Options::Get().IsVRMAModel()) {
+								Scale = 100.f;
+							}
 							FVector pos(-v.x, v.z, v.y);
-							pos *= VRMConverter::Options::Get().GetAnimationTranslateScale();
-							if (VRMConverter::Options::Get().IsVRM10Model() || VRMConverter::Options::Get().IsPMXModel() || VRMConverter::Options::Get().IsBVHModel()) {
+							pos *= Scale * VRMConverter::Options::Get().GetAnimationTranslateScale();
+							if (VRMConverter::Options::Get().IsVRM10Model()) {
+								pos.Set(v.x, -v.z, v.y);
+								pos *= Scale * VRMConverter::Options::Get().GetAnimationTranslateScale();
+							}
+							if (VRMConverter::Options::Get().IsPMXModel() || VRMConverter::Options::Get().IsBVHModel()) {
 								pos.X *= -1.f;
 								pos.Y *= -1.f;
 							}
+							//if (VRMConverter::Options::Get().IsVRMAModel() ) {
+							//	if (isRootBone) {
+							//		pos.X *= -1.f;
+							//		pos.Y *= -1.f;
+							//	}else {
+							//		pos.Set(v.x, v.y, v.z);
+							//		pos *= Scale * VRMConverter::Options::Get().GetAnimationTranslateScale();
+							//	}
+							//}
 #if UE_VERSION_OLDER_THAN(5,0,0)
 							RawTrack.PosKeys.Add(pos);
 #else
@@ -2197,7 +2324,7 @@ bool VRMConverter::ConvertModel(UVrmAssetListObject *vrmAssetList) {
 						}
 						if (chanNo == 0) {
 							if (RawTrack.PosKeys.Num()) {
-								ase->bEnableRootMotion = true;
+								//ase->bEnableRootMotion = true;
 							}
 						}
 					}
@@ -2222,9 +2349,14 @@ bool VRMConverter::ConvertModel(UVrmAssetListObject *vrmAssetList) {
 								}
 #else
 								q = FQuat4f(-v.x, v.y, v.z, -v.w);
-								{
+
+								if (VRMConverter::Options::Get().IsBVHModel()) {
 									auto d = FQuat4f(FVector3f(1, 0, 0), -PI / 2.f);
 									q = d * q * d.Inverse();
+								}
+
+								if (VRMConverter::Options::Get().IsVRM10Model()) {
+									q = FQuat4f(v.x, -v.z, v.y, v.w);
 								}
 #endif
 
@@ -2285,8 +2417,43 @@ bool VRMConverter::ConvertModel(UVrmAssetListObject *vrmAssetList) {
 							Controller.SetBoneTrackKeys(UTF8_TO_TCHAR(aiNA->mNodeName.C_Str()), RawTrack.PosKeys, RawTrack.RotKeys, RawTrack.ScaleKeys);
 						}
 #else
-						if (Controller.AddBoneCurve(UTF8_TO_TCHAR(aiNA->mNodeName.C_Str()))) {
-							Controller.SetBoneTrackKeys(UTF8_TO_TCHAR(aiNA->mNodeName.C_Str()), RawTrack.PosKeys, RawTrack.RotKeys, RawTrack.ScaleKeys);
+						{
+							if (VRMConverter::Options::Get().IsVRMAModel()) {
+								auto &presetList = vrmAssetList->VrmMetaObject->VRMAnimationMeta.expressionPreset;
+								for (auto& p : presetList) {
+									if (NodeName != *p.expressionNodeName) continue;
+
+									FFloatCurve c;
+									c.SetCurveTypeFlag(AACF_Editable, true);
+
+
+									auto boneNo = k->GetReferenceSkeleton().FindBoneIndex(*p.expressionNodeName);
+									if (boneNo != INDEX_NONE) {
+
+										for (int i = 0; i < RawTrack.PosKeys.Num(); ++i) {
+											c.UpdateOrAddKey(RawTrack.PosKeys[i].X / 100.f, i * AnimDeltaTime);
+										}
+									}
+#if	UE_VERSION_OLDER_THAN(5,3,0)
+									FSmartName sm;
+									{
+										TArray<FName> a = {*p.expressionName };
+										k->RemoveSmartnamesAndModify(USkeleton::AnimCurveMappingName, a);
+									}
+									k->AddSmartNameAndModify(USkeleton::AnimCurveMappingName, *p.expressionName, sm);
+									FAnimationCurveIdentifier f(sm, ERawCurveTrackTypes::RCT_Float);
+#else
+									FAnimationCurveIdentifier f(*p.expressionName, ERawCurveTrackTypes::RCT_Float);
+#endif
+									FName name;
+									Controller.AddCurve(f);
+									Controller.SetCurveKeys(f, c.FloatCurve.GetConstRefOfKeys());
+								}
+							}
+
+							if (Controller.AddBoneCurve(NodeName)) {
+								Controller.SetBoneTrackKeys(NodeName, RawTrack.PosKeys, RawTrack.RotKeys, RawTrack.ScaleKeys);
+							}
 						}
 #endif
 
@@ -2331,6 +2498,31 @@ bool VRMConverter::ConvertModel(UVrmAssetListObject *vrmAssetList) {
 		ase->PostEditChange();
 	}
 
+	{
+		FSoftObjectPath r(TEXT("/VRM4U/Util/Actor/latest/ABP_PostProcessBase.ABP_PostProcessBase"));
+		UObject* u = r.TryLoad();
+
+		if (u) {
+			FString name = FString(TEXT("ABP_Post_")) + vrmAssetList->BaseFileName;
+
+			auto b = Cast<UAnimBlueprint>(VRM4U_StaticDuplicateObject(u, vrmAssetList->Package, *name, EObjectFlags::RF_Public | EObjectFlags::RF_Standalone));
+			if (b) {
+				b->MarkPackageDirty();
+				b->TargetSkeleton = k;
+				b->SetPreviewMesh(sk);
+#if WITH_EDITOR
+				FKismetEditorUtilities::CompileBlueprint(b);
+#endif
+				UBlueprintGeneratedClass* bpClass = Cast<UBlueprintGeneratedClass>(b->GeneratedClass);
+#if	UE_VERSION_OLDER_THAN(4,27,0)
+				sk->PostProcessAnimBlueprint = bpClass;
+#else
+				sk->SetPostProcessAnimBlueprint(bpClass);
+#endif
+				sk->PostEditChange();
+			}
+		}
+	}
 #endif
 
 	return true;

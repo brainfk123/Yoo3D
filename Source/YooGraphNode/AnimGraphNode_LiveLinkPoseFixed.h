@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "AnimNode_LiveLinkPose.h"
-#include "AnimGraph/Public/AnimGraphNode_Base.h"
+#include "AnimGraphNode_Base.h"
 #include "AnimGraphNode_LiveLinkPoseFixed.generated.h"
 
 UCLASS()

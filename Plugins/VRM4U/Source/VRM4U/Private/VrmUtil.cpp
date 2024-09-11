@@ -1,9 +1,13 @@
-﻿// VRM4U Copyright (c) 2021-2022 Haruyoshi Yamamoto. This software is released under the MIT License.
+﻿// VRM4U Copyright (c) 2021-2024 Haruyoshi Yamamoto. This software is released under the MIT License.
 
 #include "VrmUtil.h"
 
 #include "CoreMinimal.h"
 #include "UObject/ObjectMacros.h"
+#include "Misc/Paths.h"
+
+#include "VrmAssetListObject.h"
+#include "VrmMetaObject.h"
 
 
 void FImportOptionData::init() {
@@ -12,15 +16,15 @@ void FImportOptionData::init() {
 
 
 const TArray<VRMUtil::VRMBoneTable> VRMUtil::table_ue4_vrm = {
-	{"Root",""},
-	{"Pelvis","hips"},
+	{"root",""},
+	{"pelvis","hips"},
 	{"spine_01","spine"},
 	{"spine_02","chest"},
 	{"spine_03","upperChest"},
 	{"clavicle_l","leftShoulder"},
-	{"UpperArm_L","leftUpperArm"},
+	{"upperarm_l","leftUpperArm"},
 	{"lowerarm_l","leftLowerArm"},
-	{"Hand_L","leftHand"},
+	{"hand_l","leftHand"},
 	{"index_01_l","leftIndexProximal"},
 	{"index_02_l","leftIndexIntermediate"},
 	{"index_03_l","leftIndexDistal"},
@@ -39,9 +43,9 @@ const TArray<VRMUtil::VRMBoneTable> VRMUtil::table_ue4_vrm = {
 	{"lowerarm_twist_01_l",""},
 	{"upperarm_twist_01_l",""},
 	{"clavicle_r","rightShoulder"},
-	{"UpperArm_R","rightUpperArm"},
+	{"upperarm_r","rightUpperArm"},
 	{"lowerarm_r","rightLowerArm"},
-	{"Hand_R","rightHand"},
+	{"hand_r","rightHand"},
 	{"index_01_r","rightIndexProximal"},
 	{"index_02_r","rightIndexIntermediate"},
 	{"index_03_r","rightIndexDistal"},
@@ -61,16 +65,16 @@ const TArray<VRMUtil::VRMBoneTable> VRMUtil::table_ue4_vrm = {
 	{"upperarm_twist_01_r",""},
 	{"neck_01","neck"},
 	{"head","head"},
-	{"Thigh_L","leftUpperLeg"},
+	{"thigh_l","leftUpperLeg"},
 	{"calf_l","leftLowerLeg"},
 	{"calf_twist_01_l",""},
-	{"Foot_L","leftFoot"},
+	{"foot_l","leftFoot"},
 	{"ball_l","leftToes"},
 	{"thigh_twist_01_l",""},
-	{"Thigh_R","rightUpperLeg"},
+	{"thigh_r","rightUpperLeg"},
 	{"calf_r","rightLowerLeg"},
 	{"calf_twist_01_r",""},
-	{"Foot_R","rightFoot"},
+	{"foot_r","rightFoot"},
 	{"ball_r","rightToes"},
 	{"thigh_twist_01_r",""},
 	{"ik_foot_root",""},
@@ -88,15 +92,15 @@ const TArray<VRMUtil::VRMBoneTable> VRMUtil::table_ue4_vrm = {
 };
 
 const TArray<VRMUtil::VRMBoneTable> VRMUtil::table_ue4_pmx = {
-	{"Root",TEXT("全ての親")},
-	{"Pelvis",TEXT("センター")},
+	{"root",TEXT("全ての親")},
+	{"pelvis",TEXT("センター")},
 	{"spine_01",TEXT("上半身")},
 	{"spine_02",TEXT("上半身")},
 	{"spine_03",TEXT("上半身2")},
 	{"clavicle_l",TEXT("左肩")},
-	{"UpperArm_L",TEXT("左腕")},
+	{"upperarm_l",TEXT("左腕")},
 	{"lowerarm_l",TEXT("左ひじ")},
-	{"Hand_L",TEXT("左手首")},
+	{"hand_l",TEXT("左手首")},
 	{"index_01_l",TEXT("左人指１")},
 	{"index_02_l",TEXT("左人指２")},
 	{"index_03_l",TEXT("左人指３")},
@@ -115,9 +119,9 @@ const TArray<VRMUtil::VRMBoneTable> VRMUtil::table_ue4_pmx = {
 	{"lowerarm_twist_01_l",TEXT("")},
 	{"upperarm_twist_01_l",TEXT("")},
 	{"clavicle_r",TEXT("右肩")},
-	{"UpperArm_R",TEXT("右腕")},
+	{"upperarm_r",TEXT("右腕")},
 	{"lowerarm_r",TEXT("右ひじ")},
-	{"Hand_R",TEXT("右手首")},
+	{"hand_r",TEXT("右手首")},
 	{"index_01_r",TEXT("右人指１")},
 	{"index_02_r",TEXT("右人指２")},
 	{"index_03_r",TEXT("右人指３")},
@@ -137,16 +141,16 @@ const TArray<VRMUtil::VRMBoneTable> VRMUtil::table_ue4_pmx = {
 	{"upperarm_twist_01_r",TEXT("")},
 	{"neck_01",TEXT("首")},
 	{"head",TEXT("頭")},
-	{"Thigh_L",TEXT("左足")},
+	{"thigh_l",TEXT("左足")},
 	{"calf_l",TEXT("左ひざ")},
 	{"calf_twist_01_l",TEXT("")},
-	{"Foot_L",TEXT("左足首")},
+	{"foot_l",TEXT("左足首")},
 	{"ball_l",TEXT("左つま先")},
 	{"thigh_twist_01_l",TEXT("")},
-	{"Thigh_R",TEXT("右足")},
+	{"thigh_r",TEXT("右足")},
 	{"calf_r",TEXT("右ひざ")},
 	{"calf_twist_01_r",TEXT("")},
-	{"Foot_R",TEXT("右足首")},
+	{"foot_r",TEXT("右足首")},
 	{"ball_r",TEXT("右つま先")},
 	{"thigh_twist_01_r",TEXT("")},
 	{"ik_foot_root",TEXT("")},
@@ -373,15 +377,15 @@ const TArray<FString> VRMUtil::vrm_humanoid_parent_list = {
 //
 
 const TArray<FString> VRMUtil::ue4_humanoid_bone_list = {
-	"Root",
-	"Pelvis",
+	"root",
+	"pelvis",
 	"spine_01",
 	"spine_02",
 	"spine_03",
 	"clavicle_l",
-	"UpperArm_L",
+	"upperarm_l",
 	"lowerarm_l",
-	"Hand_L","leftHand",
+	"hand_l",
 	"index_01_l",
 	"index_02_l",
 	"index_03_l",
@@ -400,9 +404,9 @@ const TArray<FString> VRMUtil::ue4_humanoid_bone_list = {
 	"lowerarm_twist_01_l",
 	"upperarm_twist_01_l",
 	"clavicle_r",
-	"UpperArm_R",
+	"upperarm_r",
 	"lowerarm_r",
-	"Hand_R",
+	"hand_r",
 	"index_01_r",
 	"index_02_r",
 	"index_03_r",
@@ -422,16 +426,16 @@ const TArray<FString> VRMUtil::ue4_humanoid_bone_list = {
 	"upperarm_twist_01_r",
 	"neck_01",
 	"head",
-	"Thigh_L",
+	"thigh_l",
 	"calf_l",
 	"calf_twist_01_l",
-	"Foot_L",
+	"foot_l",
 	"ball_l",
 	"thigh_twist_01_l",
-	"Thigh_R",
+	"thigh_r",
 	"calf_r",
 	"calf_twist_01_r",
-	"Foot_R",
+	"foot_r",
 	"ball_r",
 	"thigh_twist_01_r",
 	"ik_foot_root",
@@ -449,15 +453,15 @@ const TArray<FString> VRMUtil::ue4_humanoid_bone_list = {
 };
 
 const TArray<FName> VRMUtil::ue4_humanoid_bone_list_name = {
-	"Root",
-	"Pelvis",
+	"root",
+	"pelvis",
 	"spine_01",
 	"spine_02",
 	"spine_03",
 	"clavicle_l",
-	"UpperArm_L",
+	"upperarm_l",
 	"lowerarm_l",
-	"Hand_L","leftHand",
+	"hand_l",
 	"index_01_l",
 	"index_02_l",
 	"index_03_l",
@@ -476,9 +480,9 @@ const TArray<FName> VRMUtil::ue4_humanoid_bone_list_name = {
 	"lowerarm_twist_01_l",
 	"upperarm_twist_01_l",
 	"clavicle_r",
-	"UpperArm_R",
+	"upperarm_r",
 	"lowerarm_r",
-	"Hand_R",
+	"hand_r",
 	"index_01_r",
 	"index_02_r",
 	"index_03_r",
@@ -498,16 +502,16 @@ const TArray<FName> VRMUtil::ue4_humanoid_bone_list_name = {
 	"upperarm_twist_01_r",
 	"neck_01",
 	"head",
-	"Thigh_L",
+	"thigh_l",
 	"calf_l",
 	"calf_twist_01_l",
-	"Foot_L",
+	"foot_l",
 	"ball_l",
 	"thigh_twist_01_l",
-	"Thigh_R",
+	"thigh_r",
 	"calf_r",
 	"calf_twist_01_r",
-	"Foot_R",
+	"foot_r",
 	"ball_r",
 	"thigh_twist_01_r",
 	"ik_foot_root",
@@ -581,9 +585,325 @@ void VRMAddRetargetChain(UIKRigController* con, FName name, FName begin, FName e
 	c.ChainName = name;
 	c.StartBone = r1;
 	c.EndBone = r2;
+#if	UE_VERSION_OLDER_THAN(5,4,0)
 	con->AddRetargetChain(c);
+#else
+	con->AddRetargetChain(name, begin, end, NAME_None);
+#endif
+
 #endif
 #endif
 }
 
 #endif
+
+
+void VRMRetargetData::Remove(FString BoneUE4) {
+	for (auto r : retargetTable) {
+		if (BoneUE4.Compare(r.BoneUE4, ESearchCase::IgnoreCase) == 0) {
+			retargetTable.Remove(r);
+			return;
+		}
+	}
+}
+
+void VRMRetargetData::Setup(UVrmAssetListObject* InVrmAssetList, bool bVRM, bool bBVH, bool bPMX) {
+	vrmAssetList = InVrmAssetList;
+	if (bVRM || bBVH) {
+		{
+			RetargetParts t;
+			t.BoneUE4 = TEXT("upperarm_r");
+			t.rot = FRotator(50, 0, 0);
+			retargetTable.Push(t);
+
+			t.BoneUE4 = TEXT("upperarm_l");
+			t.rot = FRotator(-50, 0, 0);
+			retargetTable.Push(t);
+
+			t.BoneUE4 = TEXT("lowerarm_r");
+			t.rot = FRotator(0, -30, 0);
+			retargetTable.Push(t);
+
+			t.BoneUE4 = TEXT("lowerarm_l");
+			t.rot = FRotator(0, 30, 0);
+			retargetTable.Push(t);
+		}
+		{
+			RetargetParts t;
+			t.BoneUE4 = TEXT("hand_r");
+			t.rot = FRotator(0, 0, 0);
+			retargetTable.Push(t);
+
+			t.BoneUE4 = TEXT("hand_l");
+			t.rot = FRotator(0, 0, 0);
+			retargetTable.Push(t);
+		}
+
+		{
+			RetargetParts t;
+			t.BoneUE4 = TEXT("pinky_01_r");
+			t.rot = FRotator(18, 12, 0);
+			retargetTable.Push(t);
+
+			t.BoneUE4 = TEXT("pinky_01_l");
+			t.rot = FRotator(-18, -12, 0);
+			retargetTable.Push(t);
+
+			t.BoneUE4 = TEXT("ring_01_r");
+			t.rot = FRotator(18, 6, 0);
+			retargetTable.Push(t);
+
+			t.BoneUE4 = TEXT("ring_01_l");
+			t.rot = FRotator(-18, -6, 0);
+			retargetTable.Push(t);
+
+			t.BoneUE4 = TEXT("index_01_r");
+			t.rot = FRotator(20, -6, 0);
+			retargetTable.Push(t);
+
+			t.BoneUE4 = TEXT("index_01_l");
+			t.rot = FRotator(-20, 6, 0);
+			retargetTable.Push(t);
+
+			t.BoneUE4 = TEXT("middle_01_r");
+			t.rot = FRotator(20, 0, 0);
+			retargetTable.Push(t);
+
+			t.BoneUE4 = TEXT("middle_01_l");
+			t.rot = FRotator(-20, 0, 0);
+			retargetTable.Push(t);
+
+
+			t.BoneUE4 = TEXT("thumb_01_r");
+			t.rot = FRotator(0, 8, 20);
+			retargetTable.Push(t);
+
+			t.BoneUE4 = TEXT("thumb_01_l");
+			t.rot = FRotator(0, -8, 20);
+			retargetTable.Push(t);
+
+			{
+				FString tmpTable[] = {
+					//"index_01_r",
+					"index_02_r",
+					"index_03_r",
+					//"middle_01_r",
+					"middle_02_r",
+					"middle_03_r",
+				};
+				for (auto& a : tmpTable) {
+					t.BoneUE4 = a;
+					t.rot = FRotator(20, 0, 0);
+					retargetTable.Push(t);
+
+					t.BoneUE4 = a.Replace(TEXT("_r"), TEXT("_l"));
+					t.rot = FRotator(-20, 0, 0);
+					retargetTable.Push(t);
+				}
+			}
+			{
+
+				FString tmpTable[] = {
+					"ring_02_r",
+					"ring_03_r",
+					//"pinky_01_r",
+					"pinky_02_r",
+					"pinky_03_r",
+				};
+				for (auto& a : tmpTable) {
+					t.BoneUE4 = a;
+					t.rot = FRotator(18, 0, 0);
+					retargetTable.Push(t);
+
+					t.BoneUE4 = a.Replace(TEXT("_r"), TEXT("_l"));
+					t.rot = FRotator(-18, 0, 0);
+					retargetTable.Push(t);
+				}
+			}
+			{
+				FString tmpTable[] = {
+					//"thumb_01_r",
+					"thumb_02_r",
+					"thumb_03_r",
+				};
+				for (auto& a : tmpTable) {
+					t.BoneUE4 = a;
+					t.rot = FRotator(0, 10, 0);
+					retargetTable.Push(t);
+
+					t.BoneUE4 = a.Replace(TEXT("_r"), TEXT("_l"));
+					t.rot = FRotator(0, -10, 0);
+					retargetTable.Push(t);
+				}
+			}
+		}
+	} // vrm, bvh
+
+	if (bPMX) {
+		{
+			RetargetParts t;
+			t.BoneUE4 = TEXT("lowerarm_r");
+			t.rot = FRotator(0, -30, 0);
+			retargetTable.Push(t);
+
+			t.BoneUE4 = TEXT("hand_r");
+			t.rot = FRotator(10, 0, 0);
+			retargetTable.Push(t);
+		}
+		{
+			RetargetParts t;
+			t.BoneUE4 = TEXT("lowerarm_l");
+			t.rot = FRotator(-0, 30, 0);
+			retargetTable.Push(t);
+
+			t.BoneUE4 = TEXT("hand_l");
+			t.rot = FRotator(-10, 0, 0);
+			retargetTable.Push(t);
+		}
+	}
+	// foot
+	{
+		RetargetParts t;
+		t.BoneUE4 = TEXT("thigh_r");
+		t.rot = FRotator(-5, 0, 0);
+		retargetTable.Push(t);
+
+		t.BoneUE4 = TEXT("thigh_l");
+		t.rot = FRotator(5, 0, 0);
+		retargetTable.Push(t);
+
+		t.BoneUE4 = TEXT("calf_r");
+		t.rot = FRotator(0, 0, 5);
+		retargetTable.Push(t);
+
+		t.BoneUE4 = TEXT("calf_l");
+		t.rot = FRotator(0, 0, 5);
+		retargetTable.Push(t);
+
+		t.BoneUE4 = TEXT("foot_r");
+		t.rot = FRotator(5, 0, -5);
+		retargetTable.Push(t);
+
+		t.BoneUE4 = TEXT("foot_l");
+		t.rot = FRotator(-5, 0, -5);
+		retargetTable.Push(t);
+	}
+
+	UpdateBoneName();
+}
+
+void VRMRetargetData::UpdateBoneName() {
+
+#pragma warning(push)
+#pragma warning(disable: 4702)
+	for (auto& a : retargetTable) {
+		bool bFound = false;
+		//vrm
+		for (auto& t : VRMUtil::table_ue4_vrm) {
+			if (t.BoneUE4.Compare(a.BoneUE4) != 0) {
+				continue;
+			}
+			auto* m = vrmAssetList->VrmMetaObject->humanoidBoneTable.Find(t.BoneVRM);
+			if (m) {
+				bFound = true;
+				a.BoneVRM = t.BoneVRM;
+				a.BoneModel = *m;
+			}
+			break;
+		}
+		if (bFound) {
+			continue;
+		}
+#if	UE_VERSION_OLDER_THAN(5,4,0)
+		//pmx
+		for (auto& t : VRMUtil::table_ue4_pmx) {
+			if (t.BoneUE4.Compare(a.BoneUE4) != 0) {
+				continue;
+			}
+			FString pmxBone;
+			VRMUtil::GetReplacedPMXBone(pmxBone, t.BoneVRM);
+
+			FString target[2] = {
+				pmxBone,
+				t.BoneVRM,
+			};
+			bool finish = false;
+			for (int i = 0; i < 2; ++i) {
+				auto* m = vrmAssetList->VrmMetaObject->humanoidBoneTable.Find(target[i]);
+				if (m) {
+					bFound = true;
+					a.BoneVRM = target[i];
+					a.BoneModel = *m;
+				}
+				finish = true;
+				break;
+			}
+
+			if (finish) break;
+		}
+#endif
+		if (bFound) {
+			continue;
+		}
+	}
+#pragma warning(pop)
+}
+
+
+
+int32 VRMUtil::GetDirectChildBones(FReferenceSkeleton& refs, int32 ParentBoneIndex, TArray<int32>& Children) {
+	Children.Reset();
+
+	const int32 NumBones = refs.GetNum();
+	for (int32 ChildIndex = ParentBoneIndex + 1; ChildIndex < NumBones; ChildIndex++)
+	{
+		if (ParentBoneIndex == refs.GetParentIndex(ChildIndex))
+		{
+			Children.Add(ChildIndex);
+		}
+	}
+
+	return Children.Num();
+}
+
+
+UVrmAssetListObject* VRMUtil::GetAssetListObject(const UObject *obj) {
+	
+	if (Cast<USkeletalMesh>(obj)) {
+		const FString full = obj->GetPathName();
+		const FString baseName = obj->GetName();
+		const FString path = FPaths::GetPath(full);
+
+		FString core = baseName;
+		core.RemoveFromStart(TEXT("SK_"));
+
+		{
+			FString targetBase = FString(TEXT("VA_")) + core + FString(TEXT("_vrmassetlist"));
+			FString target = path + FString(TEXT("/")) + targetBase + FString(TEXT(".")) + targetBase;
+			if (IsInGameThread()) {
+				FSoftObjectPath r = target;
+				UObject* u = r.ResolveObject();
+				if (u == nullptr) u = r.TryLoad();
+				if (u) {
+					return Cast<UVrmAssetListObject>(u);
+				}
+			}
+		}
+		{
+			FString targetBase = FString(TEXT("")) + core + FString(TEXT("_vrmassetlist"));
+			FString target = path + FString(TEXT("/")) + targetBase + FString(TEXT(".")) + targetBase;
+			if (IsInGameThread()) {
+				FSoftObjectPath r = target;
+				UObject* u = r.ResolveObject();
+				if (u == nullptr) u = r.TryLoad();
+				if (u) {
+					return Cast<UVrmAssetListObject>(u);
+				}
+			}
+		}
+	}
+
+
+	return nullptr;
+}
+

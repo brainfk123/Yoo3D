@@ -1,4 +1,4 @@
-// VRM4U Copyright (c) 2021-2022 Haruyoshi Yamamoto. This software is released under the MIT License.
+// VRM4U Copyright (c) 2021-2024 Haruyoshi Yamamoto. This software is released under the MIT License.
 
 #include "VrmSkeleton.h"
 #include "VrmAssetListObject.h"
@@ -88,16 +88,17 @@ FMatrix convertAiMatToFMatrix(aiMatrix4x4 t) {
 
 	if (VRMConverter::Options::Get().IsVRM10Model()) {
 		m.M[0][0] = t.a1; m.M[1][0] = t.a2; m.M[2][0] = t.a3; m.M[3][0] = t.a4 * 100.f;
-		m.M[0][1] = -t.c1; m.M[1][1] = -t.c2; m.M[2][1] = -t.c3; m.M[3][1] = -t.c4 * 100.f;//t.b4*100.f;
-		m.M[0][2] = t.b1; m.M[1][2] = t.b2; m.M[2][2] = t.b3; m.M[3][2] = t.b4 * 100.f;//t.c4*100.f;
-		m.M[0][3] = t.d1; m.M[1][3] = t.d2; m.M[2][3] = t.d3; m.M[3][3] = t.d4;
-
-		m.M[0][0] = t.a1; m.M[1][0] = t.a2; m.M[2][0] = t.a3; m.M[3][0] = t.a4 * 100.f;
 		m.M[0][1] = t.b1; m.M[1][1] = t.b2; m.M[2][1] = t.b3; m.M[3][1] = t.b4 * 100.f;//t.b4*100.f;
 		m.M[0][2] = t.c1; m.M[1][2] = t.c2; m.M[2][2] = t.c3; m.M[3][2] = t.c4 * 100.f;//t.c4*100.f;
 		m.M[0][3] = t.d1; m.M[1][3] = t.d2; m.M[2][3] = t.d3; m.M[3][3] = t.d4;
 
-		// rot after
+		// rot
+		{
+			FTransform f;
+			f.SetRotation(FRotator(0, 0, 90).Quaternion());
+
+			m = f.ToMatrixNoScale() * m * f.ToMatrixNoScale().Inverse();
+		}
 	}
 
 	if (VRMConverter::Options::Get().IsPMXModel() || VRMConverter::Options::Get().IsBVHModel()) {
@@ -272,7 +273,7 @@ void VRMSkeleton::readVrmBone(aiScene* scene, int& boneOffset, FReferenceSkeleto
 					}
 
 					continue;
-
+					/*
 					TMap<FString, FString> renameTable;
 					{
 						FString s;
@@ -311,6 +312,7 @@ void VRMSkeleton::readVrmBone(aiScene* scene, int& boneOffset, FReferenceSkeleto
 							}
 						}
 					}
+					*/
 				}
 				/*
 				if (0) {
@@ -378,14 +380,6 @@ void VRMSkeleton::readVrmBone(aiScene* scene, int& boneOffset, FReferenceSkeleto
 			{
 				FMatrix m = convertAiMatToFMatrix(node->mTransformation);
 
-				if (ParentIndex == INDEX_NONE) {
-					if (VRMConverter::Options::Get().IsVRM10Model()) {
-						FTransform f;
-						f.SetRotation(FRotator(0, 0, -90).Quaternion());
-						m *= f.ToMatrixNoScale();
-					}
-				} else {
-				}
 				FTransform localpose;
 				localpose.SetFromMatrix(m);
 
@@ -427,11 +421,6 @@ void VRMSkeleton::readVrmBone(aiScene* scene, int& boneOffset, FReferenceSkeleto
 					FMatrix m = convertAiMatToFMatrix(bone->mOffsetMatrix);
 					if (ParentIndex == INDEX_NONE) {
 					} else {
-						if (VRMConverter::Options::Get().IsVRM10Model()) {
-							//FTransform f;
-							//f.SetRotation(FRotator(0, 0, 90).Quaternion());
-							//m *= f.ToMatrixNoScale();
-						}
 					}
 
 
@@ -476,10 +465,20 @@ void VRMSkeleton::readVrmBone(aiScene* scene, int& boneOffset, FReferenceSkeleto
 			// remove local axis
 			if (VRMConverter::Options::Get().IsVRM10Model()) {
 				if (VRMConverter::Options::Get().IsVRM10RemoveLocalRotation()) {
-					pose.SetRotation(FQuat::Identity);
-					if (ParentIndex >= 0) {
-						pose.SetTranslation(poseGlobal_tpose[nodeNo].GetLocation() - poseGlobal_tpose[ParentIndex].GetLocation());
+
+					if (vrmAssetList){
+						if (vrmAssetList->VrmMetaObject) {
+							TArray<FString> v;
+							vrmAssetList->VrmMetaObject->humanoidBoneTable.GenerateValueArray(v);
+							//if (v.Find(info.Name.ToString()) != INDEX_NONE) {
+								pose.SetRotation(FQuat::Identity);
+								if (ParentIndex >= 0) {
+									pose.SetTranslation(poseGlobal_tpose[nodeNo].GetLocation() - poseGlobal_tpose[ParentIndex].GetLocation());
+								}
+							//}
+						}
 					}
+
 				}
 			}
 
@@ -496,6 +495,17 @@ void VRMSkeleton::readVrmBone(aiScene* scene, int& boneOffset, FReferenceSkeleto
 			if (totalBoneCount > 0 && ParentIndex == INDEX_NONE) {
 				// bad bone. root?
 				continue;
+			}
+			if (VRMConverter::Options::Get().IsVRMAModel()) {
+				if (vrmAssetList->VrmMetaObject) {
+					for (auto& t : vrmAssetList->VrmMetaObject->humanoidBoneTable) {
+
+						if (t.Value == info.Name.ToString()) {
+							info.Name = *t.Key;
+							break;
+						}
+					}
+				}
 			}
 
 			RefSkelModifier.Add(info, pose);

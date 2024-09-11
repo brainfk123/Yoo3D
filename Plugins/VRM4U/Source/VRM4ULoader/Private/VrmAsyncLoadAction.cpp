@@ -1,3 +1,4 @@
+// VRM4U Copyright (c) 2021-2024 Haruyoshi Yamamoto. This software is released under the MIT License.
 
 #include "VrmAsyncLoadAction.h"
 #include "Async/TaskGraphInterfaces.h"
@@ -102,7 +103,7 @@ static bool ConvTex(UVrmAssetListObject* vrmAssetList, const aiScene* mScenePtr,
 
 				FString name = FString(TEXT("T_")) + baseName;
 				auto* pkg = GetTransientPackage();
-				UTexture2D* NewTexture2D = VRMUtil::CreateTextureFromImage(name, pkg, t.pcData, t.mWidth, false, true);
+				UTexture2D* NewTexture2D = VRMLoaderUtil::CreateTextureFromImage(name, pkg, t.pcData, t.mWidth, false, true);
 				vrmAssetList->Textures[i] = NewTexture2D;
 			}
 
