@@ -1,0 +1,114 @@
+From 05968aecb55919804ce2af48a905cb57ae058d8f Mon Sep 17 00:00:00 2001
+From: brainfk <brainfk@qq.com>
+Date: Wed, 9 Oct 2024 22:40:21 +0800
+Subject: [PATCH 2/3] Modify live link plugins to support specific animation
+ features
+
+---
+ .../LiveLink/Source/LiveLink/Public/LiveLinkClient.h         | 2 ++
+ .../AppleARKitFaceSupport/Private/AppleARKitLiveLinkSource.h | 5 +++--
+ .../LiveLinkAnimationCore/Private/AnimNode_LiveLinkPose.cpp  | 2 ++
+ .../LiveLinkAnimationCore/Public/LiveLinkRetargetAsset.h     | 3 +++
+ Engine/Source/Runtime/Renderer/Private/RendererScene.cpp     | 2 +-
+ 5 files changed, 11 insertions(+), 3 deletions(-)
+
+diff --git a/Engine/Plugins/Animation/LiveLink/Source/LiveLink/Public/LiveLinkClient.h b/Engine/Plugins/Animation/LiveLink/Source/LiveLink/Public/LiveLinkClient.h
+index 3247a45b1218..711a6663f650 100644
+--- a/Engine/Plugins/Animation/LiveLink/Source/LiveLink/Public/LiveLinkClient.h
++++ b/Engine/Plugins/Animation/LiveLink/Source/LiveLink/Public/LiveLinkClient.h
+@@ -180,6 +180,8 @@ public:
+ 	UE_DEPRECATED(4.23, "FLiveLinkClient::OnLiveLinkSourcesChanged is deprecated. Please use OnLiveLinkSourceAdded instead!")
+ 	void UnregisterSourcesChangedHandle(FDelegateHandle Handle);
+ 
++	FLiveLinkSourceCollection* GetCollection() const { return Collection.Get(); }
++
+ protected:
+ 	//~ Begin FLiveLinkClient_Base_DEPRECATED implementation
+ 	using FLiveLinkClient_Base_DEPRECATED::EvaluateFrameAtSceneTime_AnyThread;
+diff --git a/Engine/Plugins/Runtime/AR/AppleAR/AppleARKitFaceSupport/Source/AppleARKitFaceSupport/Private/AppleARKitLiveLinkSource.h b/Engine/Plugins/Runtime/AR/AppleAR/AppleARKitFaceSupport/Source/AppleARKitFaceSupport/Private/AppleARKitLiveLinkSource.h
+index b401853a5a54..4423ecdaebe6 100644
+--- a/Engine/Plugins/Runtime/AR/AppleAR/AppleARKitFaceSupport/Source/AppleARKitFaceSupport/Private/AppleARKitLiveLinkSource.h
++++ b/Engine/Plugins/Runtime/AR/AppleAR/AppleARKitFaceSupport/Source/AppleARKitFaceSupport/Private/AppleARKitLiveLinkSource.h
+@@ -880,7 +880,7 @@ public:
+ 
+ 	// Bind the remote listener to the port provided by this source's connection settings.
+ 	void InitializeRemoteListener();
+-private:
++
+ 	// ILiveLinkSource interface
+ 	virtual void ReceiveClient(ILiveLinkClient* InClient, FGuid InSourceGuid) override;
+ 	virtual void InitializeSettings(ULiveLinkSourceSettings* Settings) override;
+@@ -909,6 +909,7 @@ private:
+ 	/** The last time we sent the data. Used to not send redundant data */
+ 	uint32 LastFramePublished;
+ 
++public:
+ 	/** Helper struct to contain BlendShape data per deviceId */
+ 	struct FBlendShapeStaticData
+ 	{
+@@ -918,7 +919,7 @@ private:
+ 
+ 	/** Used to track names changes for a given device and keep track of property names contained in subject */
+ 	TMap<FName, FBlendShapeStaticData> BlendShapePerDeviceMap;
+-
++private:
+ 	/** Used to listen on a socket for incoming face data and publishing this data to livelink. */
+ 	TUniquePtr<FAppleARKitLiveLinkRemoteListener> RemoteListener;
+ 
+diff --git a/Engine/Source/Runtime/LiveLinkAnimationCore/Private/AnimNode_LiveLinkPose.cpp b/Engine/Source/Runtime/LiveLinkAnimationCore/Private/AnimNode_LiveLinkPose.cpp
+index 13bcfb57aa4c..97674e8526c8 100644
+--- a/Engine/Source/Runtime/LiveLinkAnimationCore/Private/AnimNode_LiveLinkPose.cpp
++++ b/Engine/Source/Runtime/LiveLinkAnimationCore/Private/AnimNode_LiveLinkPose.cpp
+@@ -35,6 +35,7 @@ void FAnimNode_LiveLinkPose::BuildPoseFromAnimData(const FLiveLinkSubjectFrameDa
+ 	check(SkeletonData);
+ 	check(FrameData);
+ 
++	CurrentRetargetAsset->SetLiveLinkSubjectName(LiveLinkSubjectName);
+ 	CurrentRetargetAsset->BuildPoseFromAnimationData(CachedDeltaTime, SkeletonData, FrameData, Output.Pose);
+ 	CurrentRetargetAsset->BuildPoseAndCurveFromBaseData(CachedDeltaTime, SkeletonData, FrameData, Output.Pose, Output.Curve);
+ 	CachedDeltaTime = 0.f; // Reset so that if we evaluate again we don't "create" time inside of the retargeter
+@@ -47,6 +48,7 @@ void FAnimNode_LiveLinkPose::BuildPoseFromCurveData(const FLiveLinkSubjectFrameD
+ 	check(BaseStaticData);
+ 	check(BaseFrameData);
+ 
++	CurrentRetargetAsset->SetLiveLinkSubjectName(LiveLinkSubjectName);
+ 	CurrentRetargetAsset->BuildPoseAndCurveFromBaseData(CachedDeltaTime, BaseStaticData, BaseFrameData, Output.Pose, Output.Curve);
+ 	CachedDeltaTime = 0.f; // Reset so that if we evaluate again we don't "create" time inside of the retargeter
+ }
+diff --git a/Engine/Source/Runtime/LiveLinkAnimationCore/Public/LiveLinkRetargetAsset.h b/Engine/Source/Runtime/LiveLinkAnimationCore/Public/LiveLinkRetargetAsset.h
+index b9be74767b89..5d630a65831b 100644
+--- a/Engine/Source/Runtime/LiveLinkAnimationCore/Public/LiveLinkRetargetAsset.h
++++ b/Engine/Source/Runtime/LiveLinkAnimationCore/Public/LiveLinkRetargetAsset.h
+@@ -4,6 +4,7 @@
+ 
+ #include "Containers/Map.h"
+ #include "CoreMinimal.h"
++#include "LiveLinkTypes.h"
+ #include "UObject/NameTypes.h"
+ #include "UObject/Object.h"
+ #include "UObject/ObjectMacros.h"
+@@ -37,6 +38,8 @@ class ULiveLinkRetargetAsset : public UObject
+ 	// Called once when the retargeter is created 
+ 	virtual void Initialize() {}
+ 
++	virtual void SetLiveLinkSubjectName(FLiveLinkSubjectName LiveLinkSubjectName) {}
++
+ 	// Build OutPose from AnimationData if subject was from this type
+ 	virtual void BuildPoseFromAnimationData(float DeltaTime, const FLiveLinkSkeletonStaticData* InSkeletonData, const FLiveLinkAnimationFrameData* InFrameData, FCompactPose& OutPose) {}
+ 
+diff --git a/Engine/Source/Runtime/Renderer/Private/RendererScene.cpp b/Engine/Source/Runtime/Renderer/Private/RendererScene.cpp
+index accb20657a4b..82c9a1d8d274 100644
+--- a/Engine/Source/Runtime/Renderer/Private/RendererScene.cpp
++++ b/Engine/Source/Runtime/Renderer/Private/RendererScene.cpp
+@@ -1969,7 +1969,7 @@ void FScene::BatchAddPrimitivesInternal(TArrayView<T*> InPrimitives)
+ 		INC_DWORD_STAT_BY( STAT_GameToRendererMallocTotal, PrimitiveSceneProxy->GetMemoryFootprint() + PrimitiveSceneInfo->GetMemoryFootprint() );
+ 
+ 		// Verify the primitive is valid
+-		VerifyProperPIEScene(ToUObject(Primitive), World);		
++		// VerifyProperPIEScene(ToUObject(Primitive), World);		
+ 
+ 		// Increment the attachment counter, the primitive is about to be attached to the scene.
+ 		SceneData.AttachmentCounter.Increment();
+-- 
+2.45.1.windows.1
+

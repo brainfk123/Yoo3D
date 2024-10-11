@@ -5,53 +5,14 @@ using System.IO;
 
 public class Spout2 : ModuleRules
 {
-	private string ModulePath
-	{
-		get { return ModuleDirectory; }
-	}
-
 	private string ThirdPartyPath
 	{
-		get { return Path.GetFullPath(Path.Combine(ModulePath, "../../ThirdParty/")); }
-	}
-
-	public string GetPluginPath()
-	{
-		return Path.Combine(ModuleDirectory, "../../");
-	}
-
-	private string CopyToProjectBinaries(string Filepath, ReadOnlyTargetRules Target)
-	{
-		string BinariesDir = Path.Combine(GetPluginPath(), "Binaries", Target.Platform.ToString());
-		string Filename = Path.GetFileName(Filepath);
-
-		//convert relative path 
-		string FullBinariesDir = Path.GetFullPath(BinariesDir);
-
-		if (!Directory.Exists(FullBinariesDir))
-		{
-			Directory.CreateDirectory(FullBinariesDir);
-		}
-
-		string FullExistingPath = Path.Combine(FullBinariesDir, Filename);
-		bool ValidFile = false;
-
-		//File exists, check if they're the same
-		if (File.Exists(FullExistingPath))
-		{
-			ValidFile = true;
-		}
-
-		//No valid existing file found, copy new dll
-		if (!ValidFile)
-		{
-			File.Copy(Filepath, Path.Combine(FullBinariesDir, Filename), true);
-		}
-		return FullExistingPath;
+		get { return Path.GetFullPath(Path.Combine(PluginDirectory, "ThirdParty/")); }
 	}
 
 	public Spout2(ReadOnlyTargetRules Target) : base(Target)
 	{
+		OptimizeCode = CodeOptimization.InShippingBuildsOnly;
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 		
 		PublicIncludePaths.AddRange(
@@ -71,7 +32,7 @@ public class Spout2 : ModuleRules
 		PublicDependencyModuleNames.AddRange(
 			new string[]
 			{
-				"Core",
+				"Core", 
 				// ... add other public dependencies that you statically link with here ...
 			}
 			);
@@ -104,15 +65,14 @@ public class Spout2 : ModuleRules
 		if ((Target.Platform == UnrealTargetPlatform.Win64))
 		{
 			string PlatformString = (Target.Platform == UnrealTargetPlatform.Win64) ? "amd64" : "x86";
-			PublicAdditionalLibraries.Add(Path.Combine(ThirdPartyPath, "Spout/lib", PlatformString, "Spout.lib"));
-
-			string pluginDLLPath = Path.Combine(ThirdPartyPath, "Spout/lib", PlatformString, "Spout.dll");
-			string binariesPath = CopyToProjectBinaries(pluginDLLPath, Target);
-			System.Console.WriteLine("Using Spout DLL: " + binariesPath);
-			RuntimeDependencies.Add(binariesPath);
+			string LibPath = Path.Combine(ThirdPartyPath, "Spout/lib", PlatformString);
+            
+			PublicAdditionalLibraries.Add(Path.Combine(LibPath, "Spout.lib"));
+            
+			RuntimeDependencies.Add(Path.Combine(LibPath, "Spout.dll"));
 
 			// Delay-load the DLL, so we can load it from the right place first
-			PublicDelayLoadDLLs.Add(Path.Combine(ThirdPartyPath, "Spout/lib", PlatformString, "Spout.dll"));
+			PublicDelayLoadDLLs.Add("Spout.dll");
 		}
 	}
 }

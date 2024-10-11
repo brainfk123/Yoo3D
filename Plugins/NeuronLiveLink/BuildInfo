@@ -1,0 +1,9 @@
+Build: NeuronLiveLink
+Path: D:\_SDK\Livelink\NeuronLiveLinkTest\Plugins\NeuronLiveLink
+Build Computer: ntm_a5\lijin
+Build Version: 1.3.4..4.#208
+Build Time: 20240428_164009
+Source Control: git
+Repo Url: (origin https://github.com/pnmocap/NoitomMocapLiveLinkPlugin.git)(local http://platgit.ng.noitom.com.cn/scm/ll/neuronlivelink.git)
+Repo Version Info: br (HEAD detached at c6b0d6c) commit c6b0d6c84afe45da5b5b58dbf40e4a7a54db800a
+RepoDepth: 208

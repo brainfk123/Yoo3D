@@ -1,0 +1,55 @@
+From 1d4d2c41952b501d88855068883afb9137ce9f50 Mon Sep 17 00:00:00 2001
+From: brainfk <brainfk@qq.com>
+Date: Sat, 12 Oct 2024 02:01:08 +0800
+Subject: [PATCH 3/3] Workaround for crash in serialize
+
+---
+ Engine/Source/Runtime/Core/Public/Misc/Build.h            | 2 +-
+ Engine/Source/Runtime/Core/Public/Serialization/Archive.h | 2 +-
+ Engine/Source/Runtime/Engine/Private/World.cpp            | 4 ++++
+ 3 files changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/Engine/Source/Runtime/Core/Public/Misc/Build.h b/Engine/Source/Runtime/Core/Public/Misc/Build.h
+index ed4bc9f3da4f..4a07aab53a9d 100644
+--- a/Engine/Source/Runtime/Core/Public/Misc/Build.h
++++ b/Engine/Source/Runtime/Core/Public/Misc/Build.h
+@@ -164,7 +164,7 @@
+ * and eliminating string constants for field names.
+ */
+ #ifndef WITH_TEXT_ARCHIVE_SUPPORT
+-	#define WITH_TEXT_ARCHIVE_SUPPORT WITH_EDITORONLY_DATA
++	#define WITH_TEXT_ARCHIVE_SUPPORT 1
+ #endif
+ 
+ /*----------------------------------------------------------------------------
+diff --git a/Engine/Source/Runtime/Core/Public/Serialization/Archive.h b/Engine/Source/Runtime/Core/Public/Serialization/Archive.h
+index 86825d7bb217..89913d5743cf 100644
+--- a/Engine/Source/Runtime/Core/Public/Serialization/Archive.h
++++ b/Engine/Source/Runtime/Core/Public/Serialization/Archive.h
+@@ -54,7 +54,7 @@ struct FArchiveCookContext;
+ 	#define EVENT_DRIVEN_ASYNC_LOAD_ACTIVE_AT_RUNTIME (!GIsInitialLoad) 
+ #endif
+ 
+-#define DEVIRTUALIZE_FLinkerLoad_Serialize (!WITH_EDITORONLY_DATA)
++#define DEVIRTUALIZE_FLinkerLoad_Serialize 0
+ 
+ // Helper macro to make serializing a bitpacked boolean in an archive easier. 
+ // NOTE: The condition is there to avoid overwriting a value that is the same, especially important to make saving an immutable operation and avoid dirtying cachelines for nothing.
+diff --git a/Engine/Source/Runtime/Engine/Private/World.cpp b/Engine/Source/Runtime/Engine/Private/World.cpp
+index 623ed01e1467..a71b8cbdb960 100644
+--- a/Engine/Source/Runtime/Engine/Private/World.cpp
++++ b/Engine/Source/Runtime/Engine/Private/World.cpp
+@@ -2338,6 +2338,10 @@ void UWorld::InitializeNewWorld(const InitializationValues IVS, bool bInSkipInit
+ 	SpawnInfo.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+ 	// Set constant name for WorldSettings to make a network replication work between new worlds on host and client
+ 	SpawnInfo.Name = GEngine->WorldSettingsClass->GetFName();
++	if (bInSkipInitWorld)
++	{
++		SpawnInfo.NameMode = FActorSpawnParameters::ESpawnActorNameMode::Requested;
++	}
+ 	AWorldSettings* WorldSettings = SpawnActor<AWorldSettings>(GEngine->WorldSettingsClass, SpawnInfo );
+ 
+ 	// Allow the world creator to override the default game mode in case they do not plan to load a level.
+-- 
+2.45.1.windows.1
+

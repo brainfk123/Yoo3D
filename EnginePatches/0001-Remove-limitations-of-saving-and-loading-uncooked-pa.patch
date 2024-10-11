@@ -1,0 +1,218 @@
+From 024aea78ae20016ab155c45ff0973c192cfff78f Mon Sep 17 00:00:00 2001
+From: brainfk <brainfk@qq.com>
+Date: Sun, 29 Sep 2024 18:15:23 +0800
+Subject: [PATCH 1/3] Remove limitations of saving and loading uncooked
+ packages in a shipping game
+
+---
+ .../CoreUObject/Private/UObject/LinkerLoad.cpp  |  6 ++++--
+ .../CoreUObject/Private/UObject/LinkerSave.cpp  | 17 ++++++++---------
+ .../Private/UObject/SavePackage/SaveContext.h   |  5 +++++
+ .../Private/UObject/SavePackage2.cpp            |  8 ++++----
+ .../Private/UObject/UObjectGlobals.cpp          |  2 +-
+ .../CoreUObject/Public/Misc/PackagePath.h       |  2 +-
+ .../CoreUObject/Public/UObject/LinkerSave.h     |  4 ++--
+ .../CoreUObject/Public/UObject/ObjectMacros.h   |  4 ++++
+ 8 files changed, 29 insertions(+), 19 deletions(-)
+
+diff --git a/Engine/Source/Runtime/CoreUObject/Private/UObject/LinkerLoad.cpp b/Engine/Source/Runtime/CoreUObject/Private/UObject/LinkerLoad.cpp
+index 9a9f64f24ec8..ef5ee3c0e05f 100644
+--- a/Engine/Source/Runtime/CoreUObject/Private/UObject/LinkerLoad.cpp
++++ b/Engine/Source/Runtime/CoreUObject/Private/UObject/LinkerLoad.cpp
+@@ -1173,7 +1173,9 @@ FLinkerLoad::ELinkerStatus FLinkerLoad::CreateLoader(
+ 		// If want to be able to load cooked data in the editor we need to use FAsyncArchive which supports EDL cooked packages,
+ 		// otherwise the generic file reader is faster in the editor so use that
+ 		bool bCanUseAsyncLoader = (FPlatformProperties::RequiresCookedData() || GAllowCookedDataInEditorBuilds) && !GSkipAsyncLoaderForCookedData;
+-
++		// We use the generic file reader as the custom game package is uncooked
++		bCanUseAsyncLoader = bCanUseAsyncLoader && !(LoadFlags & LOAD_UncookedGamePackage);
++		
+ 		if (bCanUseAsyncLoader)
+ 		{
+ 			FAsyncArchive* AsyncArchive = new FAsyncArchive(GetPackagePath(), this,
+@@ -1464,7 +1466,7 @@ FLinkerLoad::ELinkerStatus FLinkerLoad::SerializePackageFileSummaryInternal()
+ 	}
+ 
+ 	// don't load packages that contain editor only data in builds that don't support that and vise versa
+-	if (!FPlatformProperties::HasEditorOnlyData() && !(Summary.GetPackageFlags() & PKG_FilterEditorOnly))
++	if (!FPlatformProperties::HasEditorOnlyData() && !(Summary.GetPackageFlags() & PKG_FilterEditorOnly) && !(LoadFlags & LOAD_UncookedGamePackage))
+ 	{
+ 		Async(EAsyncExecution::TaskGraphMainThread,
+ 			[DebugName = GetDebugName()]()
+diff --git a/Engine/Source/Runtime/CoreUObject/Private/UObject/LinkerSave.cpp b/Engine/Source/Runtime/CoreUObject/Private/UObject/LinkerSave.cpp
+index 28ee08f07837..a7e73e9ce4cc 100644
+--- a/Engine/Source/Runtime/CoreUObject/Private/UObject/LinkerSave.cpp
++++ b/Engine/Source/Runtime/CoreUObject/Private/UObject/LinkerSave.cpp
+@@ -29,13 +29,13 @@
+ /** A mapping of package name to generated script SHA keys */
+ TMap<FString, TArray<uint8> > FLinkerSave::PackagesToScriptSHAMap;
+ 
+-FLinkerSave::FLinkerSave(UPackage* InParent, const TCHAR* InFilename, bool bForceByteSwapping, bool bInSaveUnversioned)
++FLinkerSave::FLinkerSave(UPackage* InParent, const TCHAR* InFilename, bool bForceByteSwapping, bool bInSaveUnversioned, bool bIsSaveInGame)
+ :	FLinker(ELinkerType::Save, InParent)
+ ,	Saver(nullptr)
+ {
+ 	SetFilename(InFilename);
+ 
+-	if (FPlatformProperties::HasEditorOnlyData())
++	if (bIsSaveInGame || FPlatformProperties::HasEditorOnlyData())
+ 	{
+ 		// Create file saver.
+ 		Saver = IFileManager::Get().CreateFileWriter( InFilename, 0 );
+@@ -73,9 +73,9 @@ FLinkerSave::FLinkerSave(UPackage* InParent, const TCHAR* InFilename, bool bForc
+ 
+ 		if (Package)
+ 		{
+-#if WITH_EDITORONLY_DATA
++// #if WITH_EDITORONLY_DATA
+ 			Summary.PackageName = Package->GetName();
+-#endif
++// #endif
+ 			Summary.ChunkIDs = Package->GetChunkIDs();
+ 		}
+ 
+@@ -93,13 +93,12 @@ FLinkerSave::FLinkerSave(UPackage* InParent, const TCHAR* InFilename, bool bForc
+ 	}
+ }
+ 
+-
+-FLinkerSave::FLinkerSave(UPackage* InParent, FArchive *InSaver, bool bForceByteSwapping, bool bInSaveUnversioned)
++FLinkerSave::FLinkerSave(UPackage* InParent, FArchive *InSaver, bool bForceByteSwapping, bool bInSaveUnversioned, bool bIsSaveInGame)
+ : FLinker(ELinkerType::Save, InParent)
+ , Saver(nullptr)
+ {
+ 	SetFilename(TEXT("$$Memory$$"));
+-	if (FPlatformProperties::HasEditorOnlyData())
++	if (bIsSaveInGame || FPlatformProperties::HasEditorOnlyData())
+ 	{
+ 		// Create file saver.
+ 		Saver = InSaver;
+@@ -127,9 +126,9 @@ FLinkerSave::FLinkerSave(UPackage* InParent, FArchive *InSaver, bool bForceByteS
+ 
+ 		if (Package)
+ 		{
+-#if WITH_EDITORONLY_DATA
++// #if WITH_EDITORONLY_DATA
+ 			Summary.PackageName = Package->GetName();
+-#endif
++// #endif
+ 			Summary.ChunkIDs = Package->GetChunkIDs();
+ 		}
+ 
+diff --git a/Engine/Source/Runtime/CoreUObject/Private/UObject/SavePackage/SaveContext.h b/Engine/Source/Runtime/CoreUObject/Private/UObject/SavePackage/SaveContext.h
+index 97accfdb48e5..cebfa66209ea 100644
+--- a/Engine/Source/Runtime/CoreUObject/Private/UObject/SavePackage/SaveContext.h
++++ b/Engine/Source/Runtime/CoreUObject/Private/UObject/SavePackage/SaveContext.h
+@@ -654,6 +654,11 @@ public:
+ 		return !!(SaveArgs.SaveFlags & SAVE_Unversioned_Native);
+ 	}
+ 
++	bool IsSaveUncookedGamePackage() const
++	{
++		return !!(SaveArgs.SaveFlags & SAVE_UncookedGamePackage);
++	}
++
+ 	bool IsSaveUnversionedProperties() const
+ 	{
+ 		return !!(SaveArgs.SaveFlags & SAVE_Unversioned_Properties) && bCanUseUnversionedPropertySerialization;
+diff --git a/Engine/Source/Runtime/CoreUObject/Private/UObject/SavePackage2.cpp b/Engine/Source/Runtime/CoreUObject/Private/UObject/SavePackage2.cpp
+index 80056cfa6c70..5680ae50577d 100644
+--- a/Engine/Source/Runtime/CoreUObject/Private/UObject/SavePackage2.cpp
++++ b/Engine/Source/Runtime/CoreUObject/Private/UObject/SavePackage2.cpp
+@@ -77,7 +77,7 @@ ESavePackageResult ValidatePackage(FSaveContext& SaveContext)
+ 	SCOPED_SAVETIMER(UPackage_ValidatePackage);
+ 
+ 	// Platform can't save the package
+-	if (!FPlatformProperties::HasEditorOnlyData())
++	if (!SaveContext.IsSaveUncookedGamePackage() && !FPlatformProperties::HasEditorOnlyData())
+ 	{
+ 		return ESavePackageResult::Error;
+ 	}
+@@ -986,15 +986,15 @@ ESavePackageResult CreateLinker(FSaveContext& SaveContext)
+ 			TUniquePtr<FLargeMemoryWriter> ExportsArchive = PackageWriter ?
+ 				PackageWriter->CreateLinkerArchive(SaveContext.GetPackage()->GetFName(), SaveContext.GetAsset(), bIsOptionalRealm ? 1 : 0) :
+ 				// The LargeMemoryWriter does not need to be persistent; the LinkerSave wraps it and reports Persistent=true
+-				TUniquePtr<FLargeMemoryWriter>(new FLargeMemoryWriter(0, false /* bIsPersistent */, *SaveContext.GetPackage()->GetName()));
++				MakeUnique<FLargeMemoryWriter>(0, false /* bIsPersistent */, *SaveContext.GetPackage()->GetName());
+ 			SaveContext.SetLinker(MakePimpl<FLinkerSave>(SaveContext.GetPackage(), ExportsArchive.Release(),
+-				SaveContext.IsForceByteSwapping(), SaveContext.IsSaveUnversionedNative()));
++				SaveContext.IsForceByteSwapping(), SaveContext.IsSaveUnversionedNative(), SaveContext.IsSaveUncookedGamePackage()));
+ 		}
+ 		else
+ 		{
+ 			// Allocate the linker with a tempfile, forcing byte swapping if wanted.
+ 			SaveContext.SetTempFilename(FPaths::CreateTempFilename(*FPaths::ProjectSavedDir(), *BaseFilename.Left(32)));
+-			SaveContext.SetLinker(MakePimpl<FLinkerSave>(SaveContext.GetPackage(), *SaveContext.GetTempFilename().GetValue(), SaveContext.IsForceByteSwapping(), SaveContext.IsSaveUnversionedNative()));
++			SaveContext.SetLinker(MakePimpl<FLinkerSave>(SaveContext.GetPackage(), *SaveContext.GetTempFilename().GetValue(), SaveContext.IsForceByteSwapping(), SaveContext.IsSaveUnversionedNative(), SaveContext.IsSaveUncookedGamePackage()));
+ 			if (!SaveContext.GetLinker()->Saver)
+ 			{
+ 				FFormatNamedArguments Arguments;
+diff --git a/Engine/Source/Runtime/CoreUObject/Private/UObject/UObjectGlobals.cpp b/Engine/Source/Runtime/CoreUObject/Private/UObject/UObjectGlobals.cpp
+index 577d5df0f837..d0096ce711b2 100644
+--- a/Engine/Source/Runtime/CoreUObject/Private/UObject/UObjectGlobals.cpp
++++ b/Engine/Source/Runtime/CoreUObject/Private/UObject/UObjectGlobals.cpp
+@@ -1631,7 +1631,7 @@ UPackage* LoadPackageInternal(UPackage* InOuter, const FPackagePath& PackagePath
+ 	}
+ 
+ 	FUObjectThreadContext& ThreadContext = FUObjectThreadContext::Get();
+-	if (ShouldAlwaysLoadPackageAsync(PackagePath))
++	if (!(LoadFlags & LOAD_UncookedGamePackage) && ShouldAlwaysLoadPackageAsync(PackagePath))
+ 	{
+ 		checkf(!InOuter || !InOuter->GetOuter(), TEXT("Loading into subpackages is not implemented.")); // Subpackages are no longer supported in UE
+ 		FName PackageName(InOuter ? InOuter->GetFName() : PackagePath.GetPackageFName());
+diff --git a/Engine/Source/Runtime/CoreUObject/Public/Misc/PackagePath.h b/Engine/Source/Runtime/CoreUObject/Public/Misc/PackagePath.h
+index 5aa2d175dff8..eb84334b729c 100644
+--- a/Engine/Source/Runtime/CoreUObject/Public/Misc/PackagePath.h
++++ b/Engine/Source/Runtime/CoreUObject/Public/Misc/PackagePath.h
+@@ -13,7 +13,7 @@
+ #include "UObject/NameTypes.h"
+ 
+ #ifndef UE_SUPPORT_FULL_PACKAGEPATH
+-	#define UE_SUPPORT_FULL_PACKAGEPATH WITH_EDITOR
++	#define UE_SUPPORT_FULL_PACKAGEPATH 1
+ #endif
+ 
+ class FArchive;
+diff --git a/Engine/Source/Runtime/CoreUObject/Public/UObject/LinkerSave.h b/Engine/Source/Runtime/CoreUObject/Public/UObject/LinkerSave.h
+index 79345c85af18..f4557271e208 100644
+--- a/Engine/Source/Runtime/CoreUObject/Public/UObject/LinkerSave.h
++++ b/Engine/Source/Runtime/CoreUObject/Public/UObject/LinkerSave.h
+@@ -140,11 +140,11 @@ public:
+ 	COREUOBJECT_API static TMap<FString, TArray<uint8> > PackagesToScriptSHAMap;
+ 
+ 	/** Constructor for file writer */
+-	FLinkerSave(UPackage* InParent, const TCHAR* InFilename, bool bForceByteSwapping, bool bInSaveUnversioned = false );
++	FLinkerSave(UPackage* InParent, const TCHAR* InFilename, bool bForceByteSwapping, bool bInSaveUnversioned = false, bool bIsSaveInGame = false);
+ 	/** Constructor for memory writer */
+ 	FLinkerSave(UPackage* InParent, bool bForceByteSwapping, bool bInSaveUnversioned = false );
+ 	/** Constructor for custom savers. The linker assumes ownership of the custom saver. */
+-	FLinkerSave(UPackage* InParent, FArchive *InSaver, bool bForceByteSwapping, bool bInSaveUnversioned = false);
++	FLinkerSave(UPackage* InParent, FArchive *InSaver, bool bForceByteSwapping, bool bInSaveUnversioned = false, bool bIsSaveInGame = false);
+ 
+ 	/** Returns the appropriate name index for the source name, or INDEX_NONE if not found in NameIndices */
+ 	int32 MapName( FNameEntryId Name) const;
+diff --git a/Engine/Source/Runtime/CoreUObject/Public/UObject/ObjectMacros.h b/Engine/Source/Runtime/CoreUObject/Public/UObject/ObjectMacros.h
+index afa6ffcff0d8..70e04f91bba9 100644
+--- a/Engine/Source/Runtime/CoreUObject/Public/UObject/ObjectMacros.h
++++ b/Engine/Source/Runtime/CoreUObject/Public/UObject/ObjectMacros.h
+@@ -79,6 +79,8 @@ enum ELoadFlags
+ 	LOAD_ForFileDiff				= 0x00200000,	///< Load the package (not for diffing in the editor), instead verify at the two packages serialized output are the same, if they are not then debug break so that you can get the callstack and object information
+ 	LOAD_DisableCompileOnLoad		= 0x00400000,	///< Prevent this load call from running compile on load for the loaded blueprint (intentionally not recursive, dependencies will still compile on load)
+ 	LOAD_DisableEngineVersionChecks = 0x00800000,	///< Prevent this load call from running engine version checks
++
++	LOAD_UncookedGamePackage		= 0x10000000,	///< Load uncooked packages on disk that are saved from a shipping game
+ };
+ 
+ /** Flags for saving objects/packages, passed into UPackage::SavePackage() as a uint32 */
+@@ -105,6 +107,8 @@ enum ESaveFlags
+ 	SAVE_AllowTimeout				= 0x00010000,   ///< If present, if SavePackage is blocked by an asynchronous operation, it will quickly fail with ESavePackageResult::Timeout, otherwise it will wait for a while and then fail with ESavePackageResult::Error.
+ 	SAVE_RehydratePayloads			= 0x00020000,   ///< Any virtualized payloads in the package should be pulled and stored locally in the package file during the save
+ 	SAVE_Unversioned = SAVE_Unversioned_Native | SAVE_Unversioned_Properties,
++
++	SAVE_UncookedGamePackage		= 0x10000000,	///< Save uncooked packages to disk in a shipping game, and the UPackage object cannot have the PKG_Cooked flag
+ };
+ 
+ /** 
+-- 
+2.45.1.windows.1
+

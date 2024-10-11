@@ -4,6 +4,7 @@ public class YooGraphNode : ModuleRules
 {
     public YooGraphNode(ReadOnlyTargetRules Target) : base(Target)
     {
+        OptimizeCode = CodeOptimization.InShippingBuildsOnly;
         PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 		OverridePackageType = PackageOverrideType.GameUncookedOnly;
 
@@ -18,21 +19,14 @@ public class YooGraphNode : ModuleRules
                 "LiveLinkAnimationCore",
                 "Yoo",
                 "AnimGraphRuntime",
+                "AnimGraph",
+                "EditorFramework",
+                "UnrealEd",
+                "GraphEditor",
+                "Kismet",
+                "KismetCompiler",
+                "BlueprintGraph",
             }
         );
-        
-        if (Target.bBuildEditor)
-        {
-            PrivateDependencyModuleNames.AddRange(
-                new string[]
-                {
-                    "AnimGraph",
-                    "EditorFramework",
-                    "UnrealEd",
-                    "Kismet",
-                    "BlueprintGraph",
-                }
-            );
-        }
     }
 }

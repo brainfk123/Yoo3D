@@ -11,4 +11,9 @@ public:
 	/** IModuleInterface implementation */
 	virtual void StartupModule() override;
 	virtual void ShutdownModule() override;
+
+private:
+	void* Spout2LibraryHandle;
 };
+
+DECLARE_LOG_CATEGORY_EXTERN(LogSpout2, Log, All);
