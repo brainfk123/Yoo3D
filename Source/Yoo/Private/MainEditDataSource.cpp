@@ -1,7 +1,6 @@
 ﻿#include "MainEditDataSource.h"
 
 #include "AppleARKitLiveLinkSourceFactory.h"
-#include "AppleARKitLiveLinkSourceFactory.h"
 #include "ILiveLinkClient.h"
 #include "LiveLinkClient.h"
 #include "LiveLinkClientReference.h"
@@ -13,6 +12,7 @@
 #define LOCTEXT_NAMESPACE "EditableObject"
 
 AMainEditDataSource::AMainEditDataSource()
+	: Type(EDataSourceType::Unknown)
 {
 	SpriteComponent = CreateDefaultSubobject<UBillboardComponent>(TEXT("SpriteComponent"));
 	SpriteComponent->SetupAttachment(RootComponent);
@@ -31,6 +31,7 @@ ANeuronDataSource::ANeuronDataSource()
 	LocalEndpoint.Port = 7004;
 	
 	TypeName = LOCTEXT("ANeuronDataSource_TypeName", "Neuron");
+	Type = EDataSourceType::Motion;
 }
 
 bool ANeuronDataSource::IsLegalIPString(const FString& String)
@@ -72,6 +73,11 @@ bool ANeuronDataSource::SetLocalIPString(const FString& String)
 	UpdateSource();
 	
 	return true;
+}
+
+TArray<FName> ANeuronDataSource::BP_GetSubjectNames() const
+{
+	return GetSubjectNames();
 }
 
 TArray<FName> ANeuronDataSource::GetSubjectNames() const
@@ -172,6 +178,7 @@ AARKitDataSource::AARKitDataSource()
 	: ARKitSource(nullptr)
 {
 	TypeName = LOCTEXT("AARKitDataSource_TypeName", "ARKit");
+	Type = EDataSourceType::Face;
 }
 
 TArray<FARKitSubject> AARKitDataSource::GetSubjectAndDeviceNames() const
@@ -184,6 +191,19 @@ TArray<FARKitSubject> AARKitDataSource::GetSubjectAndDeviceNames() const
 			FName Device = Item.Key;
 			FName Subject = Item.Value.SubjectKey.SubjectName;
 			Result.Emplace(Subject, Device);
+		}
+	}
+	return Result;
+}
+
+TArray<FName> AARKitDataSource::GetSubjectNames() const
+{
+	TArray<FName> Result;
+	if (ARKitSource)
+	{
+		for (auto Item : ARKitSource->BlendShapePerDeviceMap)
+		{
+			Result.Add(Item.Value.SubjectKey.SubjectName);
 		}
 	}
 	return Result;

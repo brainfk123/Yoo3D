@@ -6,6 +6,7 @@
 #include "EditableObject.h"
 #include "MainEditCharacter.generated.h"
 
+class UCapsuleComponent;
 class ULiveLinkComponent;
 
 UCLASS()
@@ -24,10 +25,10 @@ public:
 	TObjectPtr<UCapsuleComponent> Capsule;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FName NeuronSubjectName;
+	FName MotionSubjectName;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FName ARKitFaceSubjectName;
+	FName FaceSubjectName;
 
 protected:
 	// Called when the game starts or when spawned

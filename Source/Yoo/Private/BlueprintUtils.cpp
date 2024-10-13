@@ -2,7 +2,7 @@
 
 
 #include "BlueprintUtils.h"
-
+#include "EngineUtils.h"
 #include "Yoo.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Blueprint/UserWidget.h"
@@ -86,4 +86,22 @@ TArray<UClass*> UBlueprintUtils::FindBlueprintClass(UClass* BaseClass, const FSt
 	}
 
 	return Subclasses;
+}
+
+bool UBlueprintUtils::GetAllSubjectsOfType(UObject* WorldContextObject, EDataSourceType Type, TArray<FDataSourceSubject>& Subjects)
+{
+	UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::LogAndReturnNull);
+
+	for (TActorIterator<AMainEditDataSource> It(World); It; ++It)
+	{
+		if (It->Type == Type)
+		{
+			for (FName Name : It->GetSubjectNames())
+			{
+				Subjects.Emplace(It->TypeName, Name);
+			}
+		}
+	}
+
+	return !Subjects.IsEmpty();
 }

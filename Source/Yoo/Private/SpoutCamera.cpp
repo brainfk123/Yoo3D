@@ -19,6 +19,13 @@ ASpoutCamera::ASpoutCamera(const FObjectInitializer& Initializer)
 
 	CaptureComponent = CreateDefaultSubobject<USceneCaptureComponent2D>(TEXT("CaptureComponent"));
 	CaptureComponent->SetupAttachment(RootComponent);
+	CaptureComponent->FOVAngle = GetHorizontalFieldOfView();
+	CaptureComponent->CaptureSource = SCS_FinalColorLDR;
+	CaptureComponent->PrimitiveRenderMode = ESceneCapturePrimitiveRenderMode::PRM_RenderScenePrimitives;
+	CaptureComponent->bAlwaysPersistRenderingState = true;
+	CaptureComponent->ShowFlags.TemporalAA = true;
+	CaptureComponent->ShowFlags.MotionBlur = true;
+	CaptureComponent->bUseRayTracingIfEnabled = true;
 	
 	ProxyMeshComponent = CreateOptionalDefaultSubobject<UStaticMeshComponent>(ProxyMeshComponentName);
 	if (ProxyMeshComponent)
@@ -93,13 +100,41 @@ void ASpoutCamera::BeginPlay()
 	RenderTarget2D->TargetGamma = 2.2f;
 	RenderTarget2D->InitAutoFormat(Resolution.X, Resolution.Y);
 	
-	CaptureComponent->FOVAngle = GetHorizontalFieldOfView();
-	CaptureComponent->CaptureSource = SCS_FinalColorLDR;
-	CaptureComponent->PrimitiveRenderMode = ESceneCapturePrimitiveRenderMode::PRM_RenderScenePrimitives;
-	CaptureComponent->bAlwaysPersistRenderingState = true;
-	CaptureComponent->ShowFlags.TemporalAA = true;
-	CaptureComponent->ShowFlags.MotionBlur = true;
 	CaptureComponent->TextureTarget = RenderTarget2D;
+
+	for (IInterface_PostProcessVolume* PPVolume : GetWorld()->PostProcessVolumes)
+	{
+		const FPostProcessVolumeProperties VolumeProperties = PPVolume->GetProperties();
+
+		// Skip any volumes which are disabled
+		if (!VolumeProperties.bIsEnabled)
+		{
+			continue;
+		}
+
+		float LocalWeight = FMath::Clamp(VolumeProperties.BlendWeight, 0.0f, 1.0f);
+
+		if (!VolumeProperties.bIsUnbound)
+		{
+			float DistanceToPoint = 0.0f;
+			PPVolume->EncompassesPoint(GetActorLocation(), 0.0f, &DistanceToPoint);
+
+			if (DistanceToPoint >= 0 && DistanceToPoint < VolumeProperties.BlendRadius)
+			{
+				LocalWeight *= FMath::Clamp(1.0f - DistanceToPoint / VolumeProperties.BlendRadius, 0.0f, 1.0f);
+			}
+			else
+			{
+				LocalWeight = 0.0f;
+			}
+		}
+
+		if (LocalWeight > 0.0f)
+		{
+			CaptureComponent->PostProcessSettings = *VolumeProperties.Settings;
+			break;
+		}
+	}
 	
 	for (TActorIterator<AEditableObject> It(GetWorld()); It; ++It)
 	{

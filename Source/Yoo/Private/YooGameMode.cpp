@@ -46,7 +46,6 @@ void AYooGameMode::OpenLevel(AMainEditController* Controller, FName LevelName, F
 			{
 				LoadedPackage = CreatePackage(*GetPackageLongName(LevelName));
 			}
-			LoadedPackage->SetPackageFlags(PKG_UnversionedProperties);
 				
 			ULevelStreaming* LocalLevel = FStreamLevelAction::FindAndCacheLevelStreamingObject(LevelName, World);
 			LocalLevel->SetShouldBeLoaded(true);

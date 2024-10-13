@@ -2,8 +2,6 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "CustomSpoutSender.h"
-
 #include "EditableObject.generated.h"
 
 class UEditableObjectDetailWidget;

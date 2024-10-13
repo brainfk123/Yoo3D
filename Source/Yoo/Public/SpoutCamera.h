@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "EditableObject.h"
+#include "CustomSpoutSender.h"
 #include "SpoutCamera.generated.h"
 
 UENUM()
@@ -48,13 +49,13 @@ public:
 	UFUNCTION(BlueprintCallable, meta=(BlueprintInternalUseOnly="true"))
 	void SetFocalLength(float InFocusLength);
 	
-	UFUNCTION(BlueprintCallable)
+	UFUNCTION(BlueprintCallable, BlueprintPure)
 	bool GetEnableSpoutOutput();
 	
 	UFUNCTION(BlueprintCallable)
 	void SetEnableSpoutOutput(bool bEnable);
 	
-	UFUNCTION(BlueprintCallable)
+	UFUNCTION(BlueprintCallable, BlueprintPure)
 	bool GetEnableInspector();
 	
 	UFUNCTION(BlueprintCallable)

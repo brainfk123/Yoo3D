@@ -4,6 +4,8 @@
 #include "EditableObject.h"
 #include "NeuronLiveLinkSource.h"
 #include "Interfaces/IPv4/IPv4Endpoint.h"
+#include "Components/BillboardComponent.h"
+#include "Components/SphereComponent.h"
 #include "MainEditDataSource.generated.h"
 
 class FAppleARKitLiveLinkSource;
@@ -15,6 +17,14 @@ enum class EDataSourceState : uint8
 	Online,
 	Offline,
 	Error
+};
+
+UENUM(BlueprintType)
+enum class EDataSourceType : uint8
+{
+	Unknown,
+	Motion,
+	Face
 };
 
 UCLASS(Abstract)
@@ -30,8 +40,13 @@ public:
 	UPROPERTY(EditDefaultsOnly)
 	TObjectPtr<USphereComponent> SphereComponent;
 	
-	UFUNCTION(BlueprintCallable, BlueprintPure)
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Data Source")
 	EDataSourceState CurrentStatus() const { return CurrentStatus_Implement(); }
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	EDataSourceType Type;
+
+	virtual TArray<FName> GetSubjectNames() const PURE_VIRTUAL(AMainEditDataSource::GetSubjectNames, return {};)
 
 protected:
 	virtual EDataSourceState CurrentStatus_Implement() const PURE_VIRTUAL(AMainEditDataSource::CurrentState_Implement, return EDataSourceState::Unknown;);
@@ -45,24 +60,25 @@ class ANeuronDataSource : public AMainEditDataSource
 public:
 	ANeuronDataSource();
 	
-	UFUNCTION(BlueprintCallable, BlueprintPure)
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Data Source")
 	static bool IsLegalIPString(const FString& String);
 
-	UFUNCTION(BlueprintCallable, BlueprintPure)
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Data Source")
 	FString GetLocalIPString() const;
 
-	UFUNCTION(BlueprintCallable)
+	UFUNCTION(BlueprintCallable, Category="Data Source")
 	bool SetLocalIPString(const FString& String);
 
-	UFUNCTION(BlueprintCallable, BlueprintPure)
-	TArray<FName> GetSubjectNames() const;
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Data Source", DisplayName="Get Subject Names")
+	TArray<FName> BP_GetSubjectNames() const;
 
-	UFUNCTION(BlueprintCallable, BlueprintPure)
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Data Source")
 	float GetSkeletonHeight(FName SubjectName);
 
-	UFUNCTION(BlueprintCallable)
+	UFUNCTION(BlueprintCallable, Category="Data Source")
 	void SetSkeletonHeight(FName SubjectName, float Height);
 
+	virtual TArray<FName> GetSubjectNames() const override;
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -99,9 +115,10 @@ class AARKitDataSource : public AMainEditDataSource
 public:
 	AARKitDataSource();
 
-	UFUNCTION(BlueprintCallable, BlueprintPure)
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Data Source")
 	TArray<FARKitSubject> GetSubjectAndDeviceNames() const;
-
+	
+	virtual TArray<FName> GetSubjectNames() const override;
 protected:
 	virtual void BeginPlay() override;
 
