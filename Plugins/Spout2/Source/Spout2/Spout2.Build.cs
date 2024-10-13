@@ -5,15 +5,11 @@ using System.IO;
 
 public class Spout2 : ModuleRules
 {
-	private string ThirdPartyPath
-	{
-		get { return Path.GetFullPath(Path.Combine(PluginDirectory, "ThirdParty/")); }
-	}
-
 	public Spout2(ReadOnlyTargetRules Target) : base(Target)
 	{
 		OptimizeCode = CodeOptimization.InShippingBuildsOnly;
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
+		bEnableExceptions = true;
 		
 		PublicIncludePaths.AddRange(
 			new string[] {
@@ -24,7 +20,7 @@ public class Spout2 : ModuleRules
 		
 		PrivateIncludePaths.AddRange(
 			new string[] {
-				Path.Combine(ThirdPartyPath, "Spout/include")
+				Path.Combine(ModuleDirectory, "ThirdParty")
 			}
 			);
 			
@@ -61,18 +57,5 @@ public class Spout2 : ModuleRules
 				// ... add any modules that your module loads dynamically here ...
 			}
 			);
-
-		if ((Target.Platform == UnrealTargetPlatform.Win64))
-		{
-			string PlatformString = (Target.Platform == UnrealTargetPlatform.Win64) ? "amd64" : "x86";
-			string LibPath = Path.Combine(ThirdPartyPath, "Spout/lib", PlatformString);
-            
-			PublicAdditionalLibraries.Add(Path.Combine(LibPath, "Spout.lib"));
-            
-			RuntimeDependencies.Add(Path.Combine(LibPath, "Spout.dll"));
-
-			// Delay-load the DLL, so we can load it from the right place first
-			PublicDelayLoadDLLs.Add("Spout.dll");
-		}
 	}
 }

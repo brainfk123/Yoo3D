@@ -13,6 +13,8 @@ class SPOUT2_API FSpoutSender : public FRefCountBase
 	struct FRHIContextD3D11;
 	struct FRHIContextD3D12;
 	FRHIContext* Context;
+
+	FTextureRHIRef Texture2D;
 public:
 	FSpoutSender(const FString& InName, int32 InWidth, int32 InHeight, EPixelFormat InFormat);
 	virtual ~FSpoutSender() override;

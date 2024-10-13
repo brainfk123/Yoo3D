@@ -2,37 +2,32 @@
 
 #include "Windows/AllowWindowsPlatformTypes.h" 
 #include <d3d11on12.h>
-#include "Spout.h"
+#include "SpoutCommon.h"
+#include "SpoutDirectX.h"
+#include "SpoutDX.h"
+#include "SpoutDX12.h"
+#include "SpoutSenderNames.h"
 #include "Windows/HideWindowsPlatformTypes.h"
 
 struct FSpoutSender::FRHIContext
 {
-	TRefCountPtr<ID3D11Device> D3D11Device;
-	HANDLE SharedSendingHandle = nullptr;
-	TRefCountPtr<ID3D11Texture2D> SendingTexture;
-	TRefCountPtr<ID3D11DeviceContext> DeviceContext;
-	
-	spoutSenderNames Senders;
-	spoutDirectX Sdx;
-	
 	virtual ~FRHIContext() = default;
 	
 	FRHICOMMAND_MACRO(FRHIInitializeSpoutContext)
 	{
 		FRHIContext* Context;
 		FString Name;
-		int32 Width, Height;
 		EPixelFormat Format;
 
-		FORCEINLINE_DEBUGGABLE FRHIInitializeSpoutContext(FRHIContext* InContext, const FString& InName, int32 InWidth, int32 InHeight, EPixelFormat InFormat)
-			: Context(InContext), Name(InName), Width(InWidth), Height(InHeight), Format(InFormat)
+		FORCEINLINE_DEBUGGABLE FRHIInitializeSpoutContext(FRHIContext* InContext, const FString& InName, EPixelFormat InFormat)
+			: Context(InContext), Name(InName), Format(InFormat)
 		{
 			ensure(Context);
 		}
 		
 		SPOUT2_API void Execute(FRHICommandListBase& RHICmdList) const
 		{
-			Context->RHIInitialize(RHICmdList, Name, Width, Height, Format);
+			Context->RHIInitialize(RHICmdList, Name, Format);
 		}
 	};
 	
@@ -73,14 +68,14 @@ struct FSpoutSender::FRHIContext
 		}
 	};
 
-	void Initialize(FRHICommandList& RHICmdList, const FString& InName, int32 InWidth, int32 InHeight, EPixelFormat InFormat)
+	void Initialize(FRHICommandList& RHICmdList, const FString& InName, EPixelFormat InFormat)
 	{
 		if (RHICmdList.Bypass())
 		{
-			RHIInitialize(RHICmdList, InName, InWidth, InHeight, InFormat);
+			RHIInitialize(RHICmdList, InName, InFormat);
 			return;
 		}
-		ALLOC_COMMAND_CL(RHICmdList, FRHIInitializeSpoutContext)(this, InName, InWidth, InHeight, InFormat);
+		ALLOC_COMMAND_CL(RHICmdList, FRHIInitializeSpoutContext)(this, InName, InFormat);
 	}
 
 	void Release(FRHICommandList& RHICmdList, const FString& InName)
@@ -104,7 +99,7 @@ struct FSpoutSender::FRHIContext
 		ALLOC_COMMAND_CL(RHICmdList, FRHISpoutSendTexture)(this, InName, InTexture);
 	}
 
-	virtual void RHIInitialize(FRHICommandListBase& RHICmdList, const FString& InName, int32 InWidth, int32 InHeight, EPixelFormat InFormat) = 0;
+	virtual void RHIInitialize(FRHICommandListBase& RHICmdList, const FString& InName, EPixelFormat InFormat) = 0;
 
 	virtual void RHIRelease(FRHICommandListBase& RHICmdList, const FString& InName) = 0;
 
@@ -113,111 +108,67 @@ struct FSpoutSender::FRHIContext
 
 struct FSpoutSender::FRHIContextD3D11 : FRHIContext
 {
-	virtual void RHIInitialize(FRHICommandListBase& RHICmdList, const FString& InName, int32 InWidth, int32 InHeight, EPixelFormat InFormat) override
+	spoutDX Sender;
+	
+	virtual void RHIInitialize(FRHICommandListBase& RHICmdList, const FString& InName, EPixelFormat InFormat) override
 	{
-		D3D11Device = static_cast<ID3D11Device*>(GDynamicRHI->RHIGetNativeDevice());
-		D3D11Device->GetImmediateContext(DeviceContext.GetInitReference());
+		ID3D11Device* D3D11Device = static_cast<ID3D11Device*>(GDynamicRHI->RHIGetNativeDevice());
 		
 		DXGI_FORMAT RHITexFormat = (DXGI_FORMAT)GPixelFormats[InFormat].PlatformFormat;
 		if (RHITexFormat == DXGI_FORMAT_B8G8R8A8_TYPELESS)
 		{
 			RHITexFormat = DXGI_FORMAT_B8G8R8A8_UNORM;
 		}
-		
-		verify(Sdx.CreateSharedDX11Texture(D3D11Device, InWidth, InHeight, RHITexFormat, SendingTexture.GetInitReference(), SharedSendingHandle));
-		verify(Senders.CreateSender(StringCast<ANSICHAR>(*InName).Get(), InWidth, InHeight, SharedSendingHandle, RHITexFormat));
+
+		verify(Sender.OpenDirectX11(D3D11Device));
+		verify(Sender.SetSenderName(StringCast<ANSICHAR>(*InName).Get()));
+		Sender.SetSenderFormat(RHITexFormat);
 	}
 
 	virtual void RHIRelease(FRHICommandListBase& RHICmdList, const FString& InName) override
 	{
-		Senders.ReleaseSenderName(StringCast<ANSICHAR>(*InName).Get());
-		SendingTexture.SafeRelease();
-		DeviceContext.SafeRelease();
-		D3D11Device.SafeRelease();
+		Sender.ReleaseSender();
+		Sender.CloseDirectX11();
 	}
 
 	virtual void RHISendTexture(FRHICommandListBase& RHICmdList, const FString& InName, FRHITexture* InTexture) override
 	{
 		ID3D11Texture2D* NativeTex = (ID3D11Texture2D*)InTexture->GetNativeResource();
-		FIntPoint Size = InTexture->GetDesc().Extent;
-
-		DeviceContext->CopyResource(SendingTexture, NativeTex);
-		DeviceContext->Flush();
-
-		verify(Senders.UpdateSender(StringCast<ANSICHAR>(*InName).Get(), Size.X, Size.Y, SharedSendingHandle));
+		verify(Sender.SendTexture(NativeTex))
 	}
 };
 
 struct FSpoutSender::FRHIContextD3D12 : FRHIContext
 {
-	TRefCountPtr<ID3D11On12Device> D3D11on12Device;
-	ID3D11Resource* WrappedDX11Resource = nullptr;
-	ID3D11Texture2D* NativeTex = nullptr;
+	spoutDX12 Sender;
 	
-	virtual void RHIInitialize(FRHICommandListBase& RHICmdList, const FString& InName, int32 InWidth, int32 InHeight, EPixelFormat InFormat) override
+	virtual void RHIInitialize(FRHICommandListBase& RHICmdList, const FString& InName, EPixelFormat InFormat) override
 	{
 		ID3D12Device* Device12 = static_cast<ID3D12Device*>(GDynamicRHI->RHIGetNativeDevice());
-		UINT DeviceFlags11 = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
-
-		verify(D3D11On12CreateDevice(
-			Device12,
-			DeviceFlags11,
-			nullptr,
-			0,
-			nullptr,
-			0,
-			0,
-			D3D11Device.GetInitReference(),
-			DeviceContext.GetInitReference(),
-			nullptr
-		) == S_OK);
-
-		verify(D3D11Device->QueryInterface(__uuidof(ID3D11On12Device), (void**)D3D11on12Device.GetInitReference()) == S_OK);
 		
 		DXGI_FORMAT RHITexFormat = (DXGI_FORMAT)GPixelFormats[InFormat].PlatformFormat;
 		if (RHITexFormat == DXGI_FORMAT_B8G8R8A8_TYPELESS)
 		{
 			RHITexFormat = DXGI_FORMAT_B8G8R8A8_UNORM;
 		}
-		
-		verify(Sdx.CreateSharedDX11Texture(D3D11Device, InWidth, InHeight, RHITexFormat, SendingTexture.GetInitReference(), SharedSendingHandle));
-		verify(Senders.CreateSender(StringCast<ANSICHAR>(*InName).Get(), InWidth, InHeight, SharedSendingHandle, RHITexFormat));
+
+		verify(Sender.OpenDirectX12(Device12));
+		verify(Sender.SetSenderName(StringCast<ANSICHAR>(*InName).Get()));
+		Sender.SetSenderFormat(RHITexFormat);
 	}
 
 	virtual void RHIRelease(FRHICommandListBase& RHICmdList, const FString& InName) override
 	{
-		NativeTex = nullptr;
-		WrappedDX11Resource = nullptr;
-		Senders.ReleaseSenderName(StringCast<ANSICHAR>(*InName).Get());
-		SendingTexture.SafeRelease();
-		DeviceContext.SafeRelease();
-		D3D11on12Device.SafeRelease();
-		D3D11Device.SafeRelease();
+		Sender.ReleaseSender();
+		Sender.CloseDirectX12();
 	}
 
 	virtual void RHISendTexture(FRHICommandListBase& RHICmdList, const FString& InName, FRHITexture* InTexture) override
 	{
-		ID3D11Texture2D* InNativeTex = (ID3D11Texture2D*)InTexture->GetNativeResource();
-		FIntPoint Size = InTexture->GetDesc().Extent;
-
-		if (NativeTex != InNativeTex)
-		{
-			NativeTex = InNativeTex;
-			D3D11_RESOURCE_FLAGS rf11 = {};
-			verify(D3D11on12Device->CreateWrappedResource(
-				NativeTex, &rf11,
-				D3D12_RESOURCE_STATE_COPY_SOURCE,
-				D3D12_RESOURCE_STATE_PRESENT, __uuidof(ID3D11Resource),
-				(void**)&WrappedDX11Resource) == S_OK);
-		}
-
-		ID3D11Resource* Resources[] = { WrappedDX11Resource };
-		D3D11on12Device->AcquireWrappedResources(Resources, 1);
-		DeviceContext->CopyResource(SendingTexture, WrappedDX11Resource);
-		D3D11on12Device->ReleaseWrappedResources(Resources, 1);
-		DeviceContext->Flush();
-
-		verify(Senders.UpdateSender(StringCast<ANSICHAR>(*InName).Get(), Size.X, Size.Y, SharedSendingHandle));
+		ID3D12Resource* InNativeTex = (ID3D12Resource*)InTexture->GetNativeResource();
+		ID3D11Resource* WrapedDX11Tex;
+		verify(Sender.WrapDX12Resource(InNativeTex, &WrapedDX11Tex, D3D12_RESOURCE_STATE_COPY_SOURCE));
+		verify(Sender.SendDX11Resource(WrapedDX11Tex));
 	}
 };
 
@@ -239,17 +190,18 @@ FSpoutSender::FSpoutSender(const FString& InName, int32 InWidth, int32 InHeight,
 	}
 	
 	ENQUEUE_RENDER_COMMAND(InitializeSpoutSenderCommand)(
-		[InContext = Context, InName, InWidth, InHeight, InFormat](FRHICommandListImmediate& RHICmdList)
+		[this, InWidth, InHeight, InContext = Context, InName, InFormat](FRHICommandListImmediate& RHICmdList)
 		{
 			check(InContext);
-			InContext->Initialize(RHICmdList, InName, InWidth, InHeight, InFormat);
+			Texture2D = RHICmdList.CreateTexture(FRHITextureCreateDesc::Create2D(TEXT("Spout Sender Texture2D"), {InWidth, InHeight}, InFormat));
+			InContext->Initialize(RHICmdList, InName, InFormat);
 		});
 }
 
 FSpoutSender::~FSpoutSender()
 {
 	ENQUEUE_RENDER_COMMAND(ReleaseSpoutSenderCommand)(
-		[InContext = Context, InName = Name](FRHICommandListImmediate& RHICmdList)
+		[this, InContext = Context, InName = Name](FRHICommandListImmediate& RHICmdList)
 		{
 			check(InContext);
 			InContext->Release(RHICmdList, InName);
@@ -265,7 +217,11 @@ bool FSpoutSender::SendTexture(UTexture* InTexture) const
 	ENQUEUE_RENDER_COMMAND(SpoutSendTextureCommand)(
 		[this, InTexture](FRHICommandListImmediate& RHICmdList)
 		{
-			Context->SendTexture(RHICmdList, Name, InTexture->GetResource()->TextureRHI);
+			const auto TextureRHI = InTexture->GetResource()->TextureRHI;
+			RHICmdList.Transition(FRHITransitionInfo(Texture2D, ERHIAccess::Present, ERHIAccess::CopyDest));
+			RHICmdList.CopyTexture(TextureRHI, Texture2D, {});
+			RHICmdList.Transition(FRHITransitionInfo(Texture2D, ERHIAccess::CopyDest, ERHIAccess::CopySrc));
+			Context->SendTexture(RHICmdList, Name, Texture2D);
 		});
 	return true;
 }
