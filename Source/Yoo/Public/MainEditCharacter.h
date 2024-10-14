@@ -22,6 +22,9 @@ public:
 	TObjectPtr<USkeletalMeshComponent> Mesh;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TObjectPtr<USkeletalMeshComponent> ShadowProxyMesh;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	TObjectPtr<UCapsuleComponent> Capsule;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

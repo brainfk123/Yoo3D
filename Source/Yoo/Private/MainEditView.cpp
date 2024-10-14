@@ -1,6 +1,8 @@
 #include "MainEditView.h"
+#include "SpoutCamera.h"
 #include "Camera/CameraComponent.h"
 #include "Components/BillboardComponent.h"
+#include "Components/DirectionalLightComponent.h"
 
 // Sets default values
 AMainEditView::AMainEditView()
@@ -13,6 +15,15 @@ AMainEditView::AMainEditView()
 	// Create a camera...
 	CameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("MainEditView"));
 	CameraComponent->SetupAttachment(RootComponent);
+
+	CharacterLight = CreateDefaultSubobject<UDirectionalLightComponent>(TEXT("Character Light"));
+	CharacterLight->SetupAttachment(RootComponent);
+	CharacterLight->LightingChannels.bChannel0 = false;
+	CharacterLight->LightingChannels.bChannel1 = true;
+	CharacterLight->Intensity = 2.0f;
+	CharacterLight->LightColor = FColor::White;
+	CharacterLight->ForwardShadingPriority = 10;
+	CharacterLight->bAtmosphereSunLight = false;
 	
 	PlacementProxyComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PlacementProxyComponent"));
 	PlacementProxyComponent->SetupAttachment(RootComponent);
@@ -93,6 +104,18 @@ void AMainEditView::ZoomCamera(const FVector& Target, float Scale)
 	FVector CameraBoom = GetActorLocation() - Target;
 	Scale = 1.0 + (Scale - 1.0f) * ZoomSpeed;
 	SetActorLocation(Target + CameraBoom * Scale);
+}
+
+void AMainEditView::UpdateCharacterLight()
+{
+	if (MainCamera)
+	{
+		CharacterLight->SetWorldTransform(MainCamera->GetCameraTransform());
+	}
+	else
+	{
+		CharacterLight->SetWorldTransform(GetCameraTransform());
+	}
 }
 
 FVector AMainEditView::GetForward() const

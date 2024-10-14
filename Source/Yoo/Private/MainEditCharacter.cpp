@@ -14,11 +14,19 @@ AMainEditCharacter::AMainEditCharacter()
 	
 	Mesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("Skeleton Mesh"));
 	Mesh->SetupAttachment(RootComponent);
+	Mesh->LightingChannels.bChannel0 = false;
+	Mesh->LightingChannels.bChannel1 = true;
+	
+	ShadowProxyMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("Shadow Proxy Mesh"));
+	ShadowProxyMesh->SetupAttachment(Mesh);
+	ShadowProxyMesh->bCastHiddenShadow = true;
+	ShadowProxyMesh->SetVisibility(false);
 	
 	Capsule = CreateDefaultSubobject<UCapsuleComponent>(TEXT("Capsule"));
 	Capsule->SetupAttachment(Mesh);
 	Capsule->SetRelativeLocation(FVector(0.0, 0.0, Capsule->GetScaledCapsuleHalfHeight()));
 	Capsule->bHiddenInGame = false;
+	Capsule->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 }
 
 // Called when the game starts or when spawned

@@ -1,5 +1,4 @@
 #include "MainEditController.h"
-
 #include "EditableObject.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -159,6 +158,19 @@ void AMainEditController::EndInspectCamera()
 	}
 }
 
+void AMainEditController::SetMainCamera(ASpoutCamera* InCamera)
+{
+	if (MainEditView)
+	{
+		MainEditView->MainCamera = InCamera;
+	}
+}
+
+ASpoutCamera* AMainEditController::GetMainCamera()
+{
+	return MainEditView ? MainEditView->MainCamera : nullptr;
+}
+
 void AMainEditController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
@@ -246,6 +258,11 @@ void AMainEditController::Tick(float DeltaSeconds)
 		MainEditView->PlacementProxyComponent->SetWorldLocation(GetPlacementHitLocation());
 	}
 
+	if (MainEditView)
+	{
+		MainEditView->UpdateCharacterLight();
+	}
+
 	UpdateInspectorRotation();
 }
 
@@ -322,6 +339,15 @@ void AMainEditController::LoadFromLevelData(ULevelSaveData* NewLevel) const
 void AMainEditController::SaveToLevelData(ULevelSaveData* NewLevel) const
 {
 	NewLevel->ViewTransform = MainEditView->GetCameraTransform();
+}
+
+void AMainEditController::SetCharacterLight(float Intensity, FColor LightColor) const
+{
+	if (MainEditView)
+	{
+		MainEditView->CharacterLight->SetIntensity(Intensity);
+		MainEditView->CharacterLight->SetLightFColor(LightColor);
+	}
 }
 
 void AMainEditController::OnLBPressed()

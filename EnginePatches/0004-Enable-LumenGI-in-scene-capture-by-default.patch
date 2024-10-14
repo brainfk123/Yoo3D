@@ -1,0 +1,27 @@
+From 452339a5dec9132d1bf71a39ef92a9b20aa95622 Mon Sep 17 00:00:00 2001
+From: brainfk <brainfk@qq.com>
+Date: Sun, 13 Oct 2024 00:12:33 +0800
+Subject: [PATCH] Enable LumenGI in scene capture by default
+
+---
+ .../Source/Runtime/Renderer/Private/SceneCaptureRendering.cpp | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/Engine/Source/Runtime/Renderer/Private/SceneCaptureRendering.cpp b/Engine/Source/Runtime/Renderer/Private/SceneCaptureRendering.cpp
+index 3e067ab6890e..5d6fb89458cf 100644
+--- a/Engine/Source/Runtime/Renderer/Private/SceneCaptureRendering.cpp
++++ b/Engine/Source/Runtime/Renderer/Private/SceneCaptureRendering.cpp
+@@ -762,8 +762,8 @@ void SetupViewFamilyForSceneCapture(
+ 		View->StartFinalPostprocessSettings(SceneCaptureViewInfo.ViewOrigin);
+ 
+ 		// By default, Lumen is disabled in scene captures, but can be re-enabled with the post process settings in the component.
+-		View->FinalPostProcessSettings.DynamicGlobalIlluminationMethod = EDynamicGlobalIlluminationMethod::None;
+-		View->FinalPostProcessSettings.ReflectionMethod = EReflectionMethod::None;
++		View->FinalPostProcessSettings.DynamicGlobalIlluminationMethod = EDynamicGlobalIlluminationMethod::Lumen;
++		View->FinalPostProcessSettings.ReflectionMethod = EReflectionMethod::Lumen;
+ 
+ 		// Default surface cache to lower resolution for Scene Capture.  Can be overridden via post process settings.
+ 		View->FinalPostProcessSettings.LumenSurfaceCacheResolution = 0.5f;
+-- 
+2.45.1.windows.1
+

@@ -10,6 +10,7 @@ public class Spout2 : ModuleRules
 		OptimizeCode = CodeOptimization.InShippingBuildsOnly;
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 		bEnableExceptions = true;
+		bUseUnity = false;
 		
 		PublicIncludePaths.AddRange(
 			new string[] {

@@ -4,6 +4,9 @@
 #include "GameFramework/Pawn.h"
 #include "MainEditView.generated.h"
 
+class ASpoutCamera;
+class UCameraComponent;
+
 UCLASS()
 class YOO_API AMainEditView : public APawn
 {
@@ -14,7 +17,13 @@ public:
 	AMainEditView();
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Editor)
-	class UCameraComponent* CameraComponent;
+	TObjectPtr<UCameraComponent> CameraComponent;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Character|Lighting")
+	TObjectPtr<UDirectionalLightComponent> CharacterLight;
+
+	UPROPERTY()
+	TObjectPtr<ASpoutCamera> MainCamera;
 
 	UPROPERTY(VisibleAnywhere, Category = Editor)
 	TObjectPtr<class UStaticMeshComponent> PlacementProxyComponent;
@@ -52,6 +61,8 @@ public:
 	void RotateCamera(const FVector& Target, const FRotator& BaseRotation);
 	void PanCamera(const FVector2D& Offset);
 	void ZoomCamera(const FVector& Target, float Scale);
+
+	void UpdateCharacterLight();
 
 	FVector GetForward() const;
 	FVector GetLocation() const;

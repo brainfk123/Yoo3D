@@ -39,6 +39,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, BlueprintSetter=SetResolution)
 	FIntPoint Resolution;
+	
+	UFUNCTION(BlueprintCallable, BlueprintPure)
+	FTransform GetCameraTransform() const;
 
 	UFUNCTION(BlueprintCallable, meta=(BlueprintInternalUseOnly="true"))
 	void SetResolution(FIntPoint InResolution);

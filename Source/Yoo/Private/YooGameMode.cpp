@@ -7,8 +7,10 @@
 #include "YooCharacter.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/RuntimeErrors.h"
-#include "UObject/ConstructorHelpers.h"
 #include "UObject/SavePackage.h"
+#include "Components/DirectionalLightComponent.h"
+
+#define LOCTEXT_NAMESPACE "AYooGameMode"
 
 static FName Name_DefaultLevel(TEXT("Default"));
 
@@ -45,6 +47,7 @@ void AYooGameMode::OpenLevel(AMainEditController* Controller, FName LevelName, F
 			else
 			{
 				LoadedPackage = CreatePackage(*GetPackageLongName(LevelName));
+				LoadedPackage->SetFlags(RF_Transactional);
 			}
 				
 			ULevelStreaming* LocalLevel = FStreamLevelAction::FindAndCacheLevelStreamingObject(LevelName, World);
@@ -84,6 +87,11 @@ void AYooGameMode::OpenLevel(AMainEditController* Controller, FName LevelName, F
 					Actor->DispatchBeginPlay();
 				}
 			}
+
+			if (FMainEditLevelInfo Info; FindLevelInfo(LevelName, Info))
+			{
+				Controller->SetCharacterLight(Info.Intensity, Info.LightColor);
+			}
 		}
 	}
 }
@@ -91,7 +99,7 @@ void AYooGameMode::OpenLevel(AMainEditController* Controller, FName LevelName, F
 void AYooGameMode::BeginPlay()
 {
 	Super::BeginPlay();
-
+	
 	if (LastOpenedLevel == NAME_None)
 	{
 		OpenLevel(GetWorld()->GetFirstPlayerController<AMainEditController>(), Name_DefaultLevel, FOnLevelOpenComplete());
@@ -173,3 +181,20 @@ ULevelSaveData* AYooGameMode::CreateNewLevelData(UPackage* LoadedPackage, FName 
 	
 	return NewLevelData;
 }
+
+bool AYooGameMode::FindLevelInfo(FName Name, FMainEditLevelInfo& OutInfo)
+{
+	if (auto* Levels = FindObject<UMainEditLevelData>(FTopLevelAssetPath(TEXT("/Game/NewEditor/Maps/LevelData.LevelData"))))
+	{
+		for (const auto& Info : Levels->LevelData)
+		{
+			if (Info.LevelName == Name)
+			{
+				OutInfo = Info;
+				return true;
+			}
+		}
+	}
+	return false;
+}
+#undef LOCTEXT_NAMESPACE

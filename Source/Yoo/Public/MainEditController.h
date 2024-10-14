@@ -171,6 +171,12 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = Game)
 	void EndInspectCamera();
+
+	UFUNCTION(BlueprintCallable, Category = Game)
+	void SetMainCamera(ASpoutCamera* InCamera);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = Game)
+	ASpoutCamera* GetMainCamera();
 	
 	virtual void SetupInputComponent() override;
 	
@@ -185,6 +191,7 @@ public:
 	void UpdateInspectorRotation();
 	void LoadFromLevelData(ULevelSaveData* NewLevel) const;
 	void SaveToLevelData(ULevelSaveData* NewLevel) const;
+	void SetCharacterLight(float Intensity, FColor LightColor) const;
 
 	/** Input handlers for SetDestination action. */
 	void OnLBPressed();

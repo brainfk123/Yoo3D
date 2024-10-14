@@ -37,6 +37,11 @@ ASpoutCamera::ASpoutCamera(const FObjectInitializer& Initializer)
 	}
 }
 
+FTransform ASpoutCamera::GetCameraTransform() const
+{
+	return CaptureComponent->GetComponentTransform();
+}
+
 void ASpoutCamera::SetResolution(FIntPoint InResolution)
 {
 	Resolution = InResolution;

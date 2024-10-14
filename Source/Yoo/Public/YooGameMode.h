@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "MainEditLevelData.h"
 #include "GameFramework/GameModeBase.h"
 #include "YooGameMode.generated.h"
 
@@ -25,7 +26,7 @@ public:
 
 	UPROPERTY(Config)
 	FName LastOpenedLevel;
-
+	
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	
@@ -34,6 +35,7 @@ protected:
 	static FString GetSaveFileName(FName InName);
 	static FString GetPackageLongName(FName InName);
 	ULevelSaveData* CreateNewLevelData(UPackage* LoadedPackage, FName InLevelName) const;
+	static bool FindLevelInfo(FName Name, FMainEditLevelInfo& OutInfo);
 
 	UPROPERTY(Transient)
 	TObjectPtr<ULevelSaveData> CurrentLevel;

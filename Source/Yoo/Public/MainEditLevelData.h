@@ -17,6 +17,12 @@ struct FMainEditLevelInfo
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TObjectPtr<UTexture2D> LevelThumbnail;
+
+	UPROPERTY(BlueprintReadOnly, interp, Category="Character|Lighting", meta=(DisplayName = "Intensity", ClampMin = "0.0", UIMax = "20.0"))
+	float Intensity = 2.0;
+
+	UPROPERTY(BlueprintReadOnly, interp, Category="Character|Lighting", meta=(HideAlphaChannel))
+	FColor LightColor = FColor::White;
 };
 
 UCLASS()
