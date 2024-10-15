@@ -122,7 +122,7 @@ void AYooGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 bool AYooGameMode::SaveLevelPackage(ULevelSaveData* LevelToSave)
 {
-	SaveConfig(CPF_Config, *FPaths::Combine(FPaths::ProjectConfigDir(), TEXT("YooEditor.ini")));
+	SaveConfig(CPF_Config, *FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Config"), TEXT("YooEditor.ini")));
 	UPackage* Package = LevelToSave->GetOutermost();
 	if (ensure(Package))
 	{

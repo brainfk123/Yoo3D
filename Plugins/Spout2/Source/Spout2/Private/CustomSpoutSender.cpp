@@ -121,7 +121,12 @@ struct FSpoutSender::FRHIContextD3D11 : FRHIContext
 		}
 
 		verify(Sender.OpenDirectX11(D3D11Device));
-		verify(Sender.SetSenderName(StringCast<ANSICHAR>(*InName).Get()));
+		
+		// workaround for obs spout2 plugins utf8 issue
+		const FString FixedName = FString::Printf(TEXT("[%s]"), *InName);
+		const auto Conversion = StringCast<UTF8CHAR>(*FixedName);
+		verify(Sender.SetSenderName(reinterpret_cast<const char*>(Conversion.Get())));
+		
 		Sender.SetSenderFormat(RHITexFormat);
 	}
 
@@ -153,7 +158,12 @@ struct FSpoutSender::FRHIContextD3D12 : FRHIContext
 		}
 
 		verify(Sender.OpenDirectX12(Device12));
-		verify(Sender.SetSenderName(StringCast<ANSICHAR>(*InName).Get()));
+
+		// workaround for obs spout2 plugins utf8 issue
+		const FString FixedName = FString::Printf(TEXT("[%s]"), *InName);
+		const auto Conversion = StringCast<UTF8CHAR>(*FixedName);
+		verify(Sender.SetSenderName(reinterpret_cast<const char*>(Conversion.Get())));
+		
 		Sender.SetSenderFormat(RHITexFormat);
 	}
 
