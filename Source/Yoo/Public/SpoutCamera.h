@@ -75,6 +75,7 @@ public:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
 
+	virtual void PreSave(FObjectPreSaveContext SaveContext) override;
 	virtual void PostLoad() override;
 
 	virtual bool ShouldOutputToSpout() const { return HasAnyFlags(ECameraFlag::SpoutOutput); }
@@ -83,6 +84,7 @@ public:
 	void OnCreateObject(AEditableObject* NewObject) const;
 	float GetHorizontalFieldOfView() const;
 	bool ShouldCaptureRealtime() const { return HasAnyFlags(ECameraFlag::SpoutOutput | ECameraFlag::Inspector); }
+	void UpdatePostProcess() const;
 
 protected:
 	UPROPERTY()

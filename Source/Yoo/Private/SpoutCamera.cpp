@@ -1,5 +1,6 @@
 #include "SpoutCamera.h"
 #include "MainEditController.h"
+#include "UObject/ObjectSaveContext.h"
 
 #define LOCTEXT_NAMESPACE "EditableObject"
 
@@ -106,40 +107,6 @@ void ASpoutCamera::BeginPlay()
 	RenderTarget2D->InitAutoFormat(Resolution.X, Resolution.Y);
 	
 	CaptureComponent->TextureTarget = RenderTarget2D;
-
-	for (IInterface_PostProcessVolume* PPVolume : GetWorld()->PostProcessVolumes)
-	{
-		const FPostProcessVolumeProperties VolumeProperties = PPVolume->GetProperties();
-
-		// Skip any volumes which are disabled
-		if (!VolumeProperties.bIsEnabled)
-		{
-			continue;
-		}
-
-		float LocalWeight = FMath::Clamp(VolumeProperties.BlendWeight, 0.0f, 1.0f);
-
-		if (!VolumeProperties.bIsUnbound)
-		{
-			float DistanceToPoint = 0.0f;
-			PPVolume->EncompassesPoint(GetActorLocation(), 0.0f, &DistanceToPoint);
-
-			if (DistanceToPoint >= 0 && DistanceToPoint < VolumeProperties.BlendRadius)
-			{
-				LocalWeight *= FMath::Clamp(1.0f - DistanceToPoint / VolumeProperties.BlendRadius, 0.0f, 1.0f);
-			}
-			else
-			{
-				LocalWeight = 0.0f;
-			}
-		}
-
-		if (LocalWeight > 0.0f)
-		{
-			CaptureComponent->PostProcessSettings = *VolumeProperties.Settings;
-			break;
-		}
-	}
 	
 	for (TActorIterator<AEditableObject> It(GetWorld()); It; ++It)
 	{
@@ -173,7 +140,13 @@ void ASpoutCamera::BeginPlay()
 void ASpoutCamera::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
 	CaptureComponent->bCaptureEveryFrame = ShouldCaptureRealtime();
+	
+	if (CaptureComponent->bCaptureEveryFrame)
+	{
+		UpdatePostProcess();
+	}
 
 	if (ShouldOutputToSpout())
 	{
@@ -187,6 +160,16 @@ void ASpoutCamera::Tick(float DeltaTime)
 	{
 		SpoutSender.SafeRelease();
 	}
+}
+
+void ASpoutCamera::PreSave(FObjectPreSaveContext SaveContext)
+{
+	if (CaptureComponent)
+	{
+		CaptureComponent->PostProcessSettings = FPostProcessSettings{};
+	}
+	
+	Super::PreSave(SaveContext);
 }
 
 void ASpoutCamera::PostLoad()
@@ -219,6 +202,43 @@ float ASpoutCamera::GetHorizontalFieldOfView() const
 	}
 
 	return 0.f;
+}
+
+void ASpoutCamera::UpdatePostProcess() const
+{
+	for (IInterface_PostProcessVolume* PPVolume : GetWorld()->PostProcessVolumes)
+	{
+		const FPostProcessVolumeProperties VolumeProperties = PPVolume->GetProperties();
+
+		// Skip any volumes which are disabled
+		if (!VolumeProperties.bIsEnabled)
+		{
+			continue;
+		}
+
+		float LocalWeight = FMath::Clamp(VolumeProperties.BlendWeight, 0.0f, 1.0f);
+
+		if (!VolumeProperties.bIsUnbound)
+		{
+			float DistanceToPoint = 0.0f;
+			PPVolume->EncompassesPoint(GetActorLocation(), 0.0f, &DistanceToPoint);
+
+			if (DistanceToPoint >= 0 && DistanceToPoint < VolumeProperties.BlendRadius)
+			{
+				LocalWeight *= FMath::Clamp(1.0f - DistanceToPoint / VolumeProperties.BlendRadius, 0.0f, 1.0f);
+			}
+			else
+			{
+				LocalWeight = 0.0f;
+			}
+		}
+
+		if (LocalWeight > 0.0f)
+		{
+			CaptureComponent->PostProcessSettings = *VolumeProperties.Settings;
+			break;
+		}
+	}
 }
 
 AProxyCamera::AProxyCamera(const FObjectInitializer& Initializer)
