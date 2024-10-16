@@ -92,6 +92,7 @@ void AYooGameMode::OpenLevel(AMainEditController* Controller, FName LevelName, F
 			{
 				Controller->SetCharacterLight(Info.Intensity, Info.LightColor);
 			}
+			Controller->SetMainCamera(CurrentLevel->MainCamera);
 		}
 	}
 }

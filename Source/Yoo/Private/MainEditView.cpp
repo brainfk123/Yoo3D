@@ -24,6 +24,8 @@ AMainEditView::AMainEditView()
 	CharacterLight->LightColor = FColor::White;
 	CharacterLight->ForwardShadingPriority = 10;
 	CharacterLight->bAtmosphereSunLight = false;
+	CharacterLight->CastRaytracedShadow = ECastRayTracedShadow::Disabled;
+	CharacterLight->DynamicShadowDistanceMovableLight = 10000.0f;
 	
 	PlacementProxyComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PlacementProxyComponent"));
 	PlacementProxyComponent->SetupAttachment(RootComponent);

@@ -162,6 +162,13 @@ void ASpoutCamera::Tick(float DeltaTime)
 	}
 }
 
+void ASpoutCamera::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	Super::EndPlay(EndPlayReason);
+	
+	SpoutSender.SafeRelease();
+}
+
 void ASpoutCamera::PreSave(FObjectPreSaveContext SaveContext)
 {
 	if (CaptureComponent)

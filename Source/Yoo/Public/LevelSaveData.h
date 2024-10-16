@@ -4,6 +4,7 @@
 #include "UObject/Object.h"
 #include "LevelSaveData.generated.h"
 
+class ASpoutCamera;
 class AEditableObject;
 
 UCLASS(BlueprintType)
@@ -22,4 +23,7 @@ public:
 
 	UPROPERTY()
 	TObjectPtr<UWorld> DummyWorld;
+
+	UPROPERTY()
+	TObjectPtr<ASpoutCamera> MainCamera;
 };

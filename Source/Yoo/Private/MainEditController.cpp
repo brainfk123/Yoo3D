@@ -339,6 +339,7 @@ void AMainEditController::LoadFromLevelData(ULevelSaveData* NewLevel) const
 void AMainEditController::SaveToLevelData(ULevelSaveData* NewLevel) const
 {
 	NewLevel->ViewTransform = MainEditView->GetCameraTransform();
+	NewLevel->MainCamera = MainEditView->MainCamera;
 }
 
 void AMainEditController::SetCharacterLight(float Intensity, FColor LightColor) const
