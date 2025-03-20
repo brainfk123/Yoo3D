@@ -1,4 +1,7 @@
 ﻿#include "MainEditCharacter.h"
+
+#include "LiveLinkRemapAsset.h"
+#include "LiveLinkRetargetAsset.h"
 #include "Components/CapsuleComponent.h"
 
 
@@ -7,8 +10,6 @@ AMainEditCharacter::AMainEditCharacter()
 {
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
-	MotionSubjectName = NAME_None;
-	FaceSubjectName = NAME_None;
 	
 	SetRootComponent(CreateDefaultSubobject<USceneComponent>(TEXT("Root")));
 	
@@ -27,6 +28,24 @@ AMainEditCharacter::AMainEditCharacter()
 	Capsule->SetRelativeLocation(FVector(0.0, 0.0, Capsule->GetScaledCapsuleHalfHeight()));
 	Capsule->bHiddenInGame = false;
 	Capsule->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+}
+
+void AMainEditCharacter::GetNameAndRetargetAsset(FDataSourceSubject Subject, FName& Name, TSubclassOf<ULiveLinkRetargetAsset>& RetargetAsset)
+{
+	Name = Subject.SubjectName;
+	RetargetAsset = ULiveLinkRemapAsset::StaticClass();
+
+	if (Subject.TypeClass)
+	{
+		for (const auto& [DataSourceClass, RetargetAssetClass] : RetargetAssetList)
+		{
+			if (Subject.TypeClass->IsChildOf(DataSourceClass))
+			{
+				RetargetAsset = RetargetAssetClass;
+				return;
+			}
+		}
+	}
 }
 
 // Called when the game starts or when spawned

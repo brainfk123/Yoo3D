@@ -9,18 +9,6 @@
 
 DECLARE_DYNAMIC_DELEGATE_OneParam(FOnColorChanged, FLinearColor, NewColor);
 
-USTRUCT(BlueprintType)
-struct FDataSourceSubject
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FText TypeName;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FName SubjectName;
-};
-
 UCLASS()
 class YOO_API UBlueprintUtils : public UBlueprintFunctionLibrary
 {
@@ -36,4 +24,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Data Source", meta = (WorldContext="WorldContextObject"))
 	static bool GetAllSubjectsOfType(UObject* WorldContextObject, EDataSourceType Type, TArray<FDataSourceSubject>& Subjects);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Data Source", meta = (WorldContext="WorldContextObject"))
+	static bool FindSubjectByName(UObject* WorldContextObject, FName Name, FDataSourceSubject& Subject);
 };

@@ -4,10 +4,25 @@
 
 #include "CoreMinimal.h"
 #include "EditableObject.h"
+#include "MainEditDataSource.h"
 #include "MainEditCharacter.generated.h"
 
+class ULiveLinkRetargetAsset;
+class AMainEditDataSource;
 class UCapsuleComponent;
 class ULiveLinkComponent;
+
+USTRUCT(BlueprintType)
+struct FRemapAssetPair
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSubclassOf<AMainEditDataSource> DataSourceClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSubclassOf<ULiveLinkRetargetAsset> RetargetAssetClass;
+};
 
 UCLASS()
 class YOO_API AMainEditCharacter : public AEditableObject
@@ -28,11 +43,20 @@ public:
 	TObjectPtr<UCapsuleComponent> Capsule;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FName MotionSubjectName;
+	FDataSourceSubject BodySubject;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FName FaceSubjectName;
+	FDataSourceSubject FaceSubject;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FDataSourceSubject HandSubject;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TArray<FRemapAssetPair> RetargetAssetList;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure)
+	void GetNameAndRetargetAsset(FDataSourceSubject Subject, FName& Name, TSubclassOf<ULiveLinkRetargetAsset>& RetargetAsset);
+	
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;

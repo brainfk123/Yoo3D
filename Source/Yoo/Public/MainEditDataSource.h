@@ -8,6 +8,7 @@
 #include "Components/SphereComponent.h"
 #include "MainEditDataSource.generated.h"
 
+class AMainEditDataSource;
 class FAppleARKitLiveLinkSource;
 
 UENUM(BlueprintType)
@@ -22,9 +23,38 @@ enum class EDataSourceState : uint8
 UENUM(BlueprintType)
 enum class EDataSourceType : uint8
 {
-	Unknown,
-	Motion,
-	Face
+	Unknown = 0,
+	Body = 1 << 0,
+	Face = 1 << 1,
+	Hand = 1 << 2,
+
+	Body_Face	= Body | Face			UMETA(DisplayName="Body & Face"),
+	Body_Hand	= Body | Hand			UMETA(DisplayName="Body & Hand"),
+	Face_Hand	= Face | Hand			UMETA(DisplayName="Face & Hand"),
+	All			= Body | Face | Hand	UMETA(DisplayName="All"),
+};
+ENUM_CLASS_FLAGS(EDataSourceType)
+
+namespace DataSourceType
+{
+	inline bool HasFlags(EDataSourceType Type, EDataSourceType Flag) { return (Type & Flag) == Flag; }
+	inline void SetFlag(EDataSourceType& Type, EDataSourceType Flag) { Type |= Flag; }
+	inline void ClearFlag(EDataSourceType& Type, EDataSourceType Flag) { Type &= ~Flag; }
+}
+
+USTRUCT(BlueprintType)
+struct FDataSourceSubject
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FText TypeName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FName SubjectName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSubclassOf<AMainEditDataSource> TypeClass;
 };
 
 UCLASS(Abstract)

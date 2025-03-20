@@ -31,7 +31,7 @@ ANeuronDataSource::ANeuronDataSource()
 	LocalEndpoint.Port = 7004;
 	
 	TypeName = LOCTEXT("ANeuronDataSource_TypeName", "Neuron");
-	Type = EDataSourceType::Motion;
+	Type = EDataSourceType::Body | EDataSourceType::Hand;
 }
 
 bool ANeuronDataSource::IsLegalIPString(const FString& String)

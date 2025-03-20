@@ -94,14 +94,35 @@ bool UBlueprintUtils::GetAllSubjectsOfType(UObject* WorldContextObject, EDataSou
 
 	for (TActorIterator<AMainEditDataSource> It(World); It; ++It)
 	{
-		if (It->Type == Type)
+		if (DataSourceType::HasFlags(It->Type, Type))
 		{
-			for (FName Name : It->GetSubjectNames())
+			for (FName SubjectName : It->GetSubjectNames())
 			{
-				Subjects.Emplace(It->TypeName, Name);
+				Subjects.Emplace(It->TypeName, SubjectName, It->GetClass());
 			}
 		}
 	}
 
 	return !Subjects.IsEmpty();
+}
+
+bool UBlueprintUtils::FindSubjectByName(UObject* WorldContextObject, FName Name, FDataSourceSubject& Subject)
+{
+	UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::LogAndReturnNull);
+	Subject.SubjectName = Name;
+
+	for (TActorIterator<AMainEditDataSource> It(World); It; ++It)
+	{
+		for (FName SubjectName : It->GetSubjectNames())
+		{
+			if (SubjectName == Name)
+			{
+				Subject.TypeName = It->TypeName;
+				Subject.TypeClass = It->GetClass();
+				return true;
+			}
+		}
+	}
+	
+	return false;
 }
